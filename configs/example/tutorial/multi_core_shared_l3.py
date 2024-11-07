@@ -2,8 +2,16 @@ import m5
 from m5.objects import *
 from cache import L1DCache,L1ICache,L2Cache,L3Cache
 import sys
+import argparse
 
-NUM_CORES = int(sys.argv[1])
+parser = argparse.ArgumentParser(description="Multicore O3 CPU with private l1,l2 and shared l3")
+parser.add_argument('-c','--command',help="Command to run enclosed in double quotes")
+parser.add_argument('-n','--num-cores',help="Number of cores to simulate",default='1')
+
+args = parser.parse_args()
+
+NUM_CORES:int = int(args.num_cores)
+cmd:str = args.command
 
 system = System()
 
@@ -67,17 +75,29 @@ system.mem_ctrl.dram = DDR3_1600_8x8()
 system.mem_ctrl.dram.range = system.mem_ranges[0]
 system.mem_ctrl.port = system.membus.mem_side_ports
 
+# system.mem_ctrl = Ramulator2()
+# system.mem_ctrl.config_path = './ext/ramulator2/ramulator2/example_config.yaml'
+# system.mem_ctrl.range = system.mem_ranges[0]
+# system.mem_ctrl.port = system.membus.mem_side_ports
+
 #Connect system port
 system.system_port = system.membus.cpu_side_ports
 
 # binary = 'tests/test-progs/hello/bin/x86/linux/hello'
-binary = '/data1/sumanthu/Splash-3/codes/kernels/fft/FFT'
-
+# binary = '/data1/sumanthu/Splash-3/codes/apps/ocean/contiguous_partitions/OCEAN'
+# binary = '/data1/sumanthu/Splash-3/codes/kernels/fft/FFT'
+# binary = '/data1/sumanthu/Splash-3/codes/apps/ocean/contiguous_partitions/OCEAN'
+# binary = '/data1/sumanthu/hyrise/build_release/hyriseConsole'
+binary = cmd.split(' ')[0]
 # for gem5 V21 and beyond
 system.workload = SEWorkload.init_compatible(binary)
 
 process = Process()
-process.cmd = [binary,"-p2","-m16"]
+# process.cmd = [binary,'/data1/sumanthu/hyrise/build_release/script.sql']
+# process.cmd = [binary,'-p2', '-n258']
+# process.cmd = [binary,'-p2', '-m16']
+process.cmd = cmd.split(' ')
+print(process.cmd)
 for cpu in system.cpus:
     cpu.workload = process
     cpu.createThreads()
