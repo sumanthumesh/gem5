@@ -1,0 +1,18 @@
+import os
+
+Import('env')
+
+if not os.path.exists(Dir('.').srcnode().abspath + '/simple_mem'):
+  env['HAVE_SIMPLEMEM'] = False
+  Return()
+
+env['HAVE_SIMPLEMEM'] = True
+simplemem_path = os.path.join(Dir('#').abspath, 'ext/simple_mem/simple_mem')
+env.Prepend(CPPPATH=Dir('.').srcnode())
+env.Append(
+  LIBS=['simplemem'],
+  LIBPATH=[simplemem_path],
+  RPATH=[simplemem_path],
+  CPPPATH=[
+  simplemem_path
+])
