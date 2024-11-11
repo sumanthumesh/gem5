@@ -1,3 +1,6 @@
 [submodule "ext/ramulator2/ramulator2"]
 	path = ext/ramulator2/ramulator2
 	url = git@github.com:sumanthumesh/ramulator2.git
+[submodule "ext/simple_mem/simple_mem"]
+	path = ext/simple_mem/simple_mem
+	url = git@github.com:sumanthumesh/analytical_model.git
