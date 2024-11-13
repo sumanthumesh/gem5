@@ -8,5 +8,5 @@ class SimpleGem5Mem(AbstractMemory):
   cxx_header = "mem/simple_gem5_mem.hh"
 
   port = ResponsePort("The port for receiving memory requests and sending responses")
-
+  tck = Param.Float("DRAM clock period in ns")
   

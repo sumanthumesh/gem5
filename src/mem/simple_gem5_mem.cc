@@ -7,17 +7,19 @@ namespace gem5 {
 namespace memory {
 
 SimpleGem5Mem::SimpleGem5Mem(const Params &p)
-    : AbstractMemory(p), port(name() + ".port", *this),
-      retryReq(false), retryResp(false),
-      startTick(0), nbrOutstandingReads(0), nbrOutstandingWrites(0),
+    : AbstractMemory(p), port(name() + ".port", *this), retryReq(false),
+      retryResp(false), startTick(0), nbrOutstandingReads(0),
+      nbrOutstandingWrites(0),
       sendResponseEvent([this] { sendResponse(); }, name()),
       tickEvent([this] { tick(); }, name()), req_id(0) {
     DPRINTF(SimpleGem5Mem, "Instantiated SimpleGem5Mem \n");
 
-    // registerExitCallback([this]() {
-    //     ramulator2_frontend->finalize();
-    //     ramulator2_memorysystem->finalize();
-    // });
+    // Set the ticks_per_ns parameter in the simulator
+    smem.set_ticks_per_ns(sim_clock::as_float::ns);
+    smem.set_tclk(p.tck);
+    registerExitCallback([this]() {
+        smem.finalize();
+    });
 }
 
 void SimpleGem5Mem::init() {
@@ -74,6 +76,9 @@ unsigned int SimpleGem5Mem::nbrOutstanding() const {
 }
 
 void SimpleGem5Mem::tick() {
+
+    // DPRINTF(SimpleGem5Mem, "Mem update\n");
+
     // Only tick when it's timing mode
     if (system()->isTimingMode()) {
         // ramulator2_memorysystem->tick();
@@ -130,9 +135,9 @@ bool SimpleGem5Mem::recvTimingReq(PacketPtr pkt) {
     if (pkt->isRead()) {
         // Generate SimpleMem READ request and try to send to memory system
         simple_mem::Req req(req_id, pkt->getAddr(), simple_mem::OpType::READ);
-        enqueue_success = smem.add_req_external(
-            req, curTick(), [this](simple_mem::Req &req) {
-                DPRINTF(SimpleGem5Mem, "Read to %ld completed.\n", req.addr);
+        enqueue_success =
+            smem.add_req_external(req, curTick(), [this](simple_mem::Req &req) {
+                DPRINTF(SimpleGem5Mem, "Read to :%ld:%#lx completed.\n", req.id, req.addr);
                 auto &pkt_q = outstandingReads.find(req.addr)->second;
                 PacketPtr pkt = pkt_q.front();
                 pkt_q.pop_front();
@@ -159,8 +164,8 @@ bool SimpleGem5Mem::recvTimingReq(PacketPtr pkt) {
         // Generate ramulator WRITE request and try to send to ramulator's
         // memory system
         simple_mem::Req req(req_id, pkt->getAddr(), simple_mem::OpType::WRITE);
-        enqueue_success = smem.add_req_external(
-            req, curTick(), [this](simple_mem::Req &req) {
+        enqueue_success =
+            smem.add_req_external(req, curTick(), [this](simple_mem::Req &req) {
                 DPRINTF(SimpleGem5Mem, "Write to %ld completed.\n", req.addr);
                 auto &pkt_q = outstandingWrites.find(req.addr)->second;
                 PacketPtr pkt = pkt_q.front();
@@ -188,6 +193,12 @@ bool SimpleGem5Mem::recvTimingReq(PacketPtr pkt) {
         // keep it simple and just respond if necessary
         accessAndRespond(pkt);
         return true;
+    }
+
+    if (enqueue_success) {
+        DPRINTF(SimpleGem5Mem, "Successfully added req %#x to memory\n",
+                pkt->getAddr());
+        req_id++;
     }
 
     return enqueue_success;
