@@ -41,6 +41,7 @@
 #include "mem/mem_ctrl.hh"
 
 #include "base/trace.hh"
+#include "base/statistics.hh"
 #include "debug/DRAM.hh"
 #include "debug/Drain.hh"
 #include "debug/MemCtrl.hh"
@@ -94,6 +95,11 @@ MemCtrl::MemCtrl(const MemCtrlParams &p) :
     if (p.disable_sanity_check) {
         port.disableSanityCheck();
     }
+
+    registerExitCallback([this]() {
+        std::cout<<"READS:"<<stats.readReqs.value()<<"\n";
+        std::cout<<"WRITES:"<<stats.writeReqs.value()<<"\n";
+    });
 }
 
 void
