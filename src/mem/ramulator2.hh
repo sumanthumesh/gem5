@@ -113,6 +113,10 @@ class Ramulator2 : public AbstractMemory
      */
     std::unique_ptr<Packet> pendingDelete;
 
+    //Store number of reads and writes for reference
+    uint64_t num_reads = 0;
+    uint64_t num_writes = 0;
+
   public:
 
     typedef Ramulator2Params Params;

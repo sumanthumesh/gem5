@@ -34,6 +34,8 @@ Ramulator2::Ramulator2(const Params &p) :
     DPRINTF(Ramulator2, "Instantiated Ramulator2 \n");
 
     registerExitCallback([this]() { 
+        std::cout<<"NUM READS: "<<num_reads<<"\n";
+        std::cout<<"NUM WRITES: "<<num_writes<<"\n";
         ramulator2_frontend->finalize();
         ramulator2_memorysystem->finalize();
     });
@@ -200,6 +202,7 @@ Ramulator2::recvTimingReq(PacketPtr pkt)
             // queue in the controller, and the response has been sent
             // back, note that this will differ for reads and writes
             ++nbrOutstandingReads;
+            num_reads++;
         } 
         else 
         {
@@ -228,6 +231,7 @@ Ramulator2::recvTimingReq(PacketPtr pkt)
             outstandingWrites[pkt->getAddr()].push_back(pkt);
 
             ++nbrOutstandingWrites;
+            num_writes++;
 
             // perform the access for writes
             accessAndRespond(pkt);
