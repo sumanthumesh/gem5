@@ -83,6 +83,7 @@ system.l3cache.cpu_side = system.l2_to_l3bus.mem_side_ports
 system.l3cache.mem_side = system.membus.cpu_side_ports
 
 system.mem_ctrl = SimpleGem5Mem()
+system.mem_ctrl.range = system.mem_ranges[0]
 system.mem_ctrl.tck = 1 / 2.4
 system.mem_ctrl.port = system.membus.mem_side_ports
 
