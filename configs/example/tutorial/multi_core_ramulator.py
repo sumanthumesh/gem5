@@ -3,12 +3,22 @@ from m5.objects import *
 from cache import L1DCache,L1ICache,L2Cache,L3Cache
 import sys
 import argparse
+import os
 
 parser = argparse.ArgumentParser(description="Multicore O3 CPU with private l1,l2 and shared l3. Memory is handled by ramulator")
 parser.add_argument('-c','--command',help="Command to run enclosed in double quotes")
 parser.add_argument('-n','--num-cores',help="Number of cores to simulate",default='1')
+parser.add_argument('--checkpoint-dir',help="Directory to store checkpoint",default=None)
+parser.add_argument('--restore-dir',help="Directory from which to pick checkpoint",default=None)
 
 args = parser.parse_args()
+
+#Both checkpoint-dir and restore-dir shouldnt be specified at the same time
+assert not(args.restore_dir and args.checkpoint_dir), "Cannot have both saving checkpoint and restoring it in same command"
+
+#Check if the checkpoint dir exists
+if args.restore_dir:
+    assert os.path.exists(args.restore_dir), f"Cannot find checkpoint at {args.restore_dir} to restore"        
 
 NUM_CORES:int = int(args.num_cores)
 cmd:str = args.command
@@ -26,7 +36,8 @@ system.mem_ranges = [AddrRange('8GB')]
 system.membus = SystemXBar()
 
 #Create CPUs
-system.cpus = [DerivO3CPU(cpu_id=i) for i in range(NUM_CORES)]
+# system.cpus = [DerivO3CPU(cpu_id=i) for i in range(NUM_CORES)]
+system.cpus = [TimingSimpleCPU(cpu_id=i) for i in range(NUM_CORES)]
 
 system.l3cache = L3Cache(size='8MB', assoc=16)  # Shared L3 cache
 
@@ -103,10 +114,33 @@ for cpu in system.cpus:
     cpu.createThreads()
 
 root = Root(full_system = False, system = system)
-m5.instantiate()
+
+
+# Explicitly trigger a checkpoint from the Python script
+if args.restore_dir:
+    m5.instantiate(args.restore_dir)
+else:
+    m5.instantiate()
+# root.checkpoint_at = 1000000  # This is the tick when the checkpoint will be taken
+# m5.checkpoint("/data1/sumanthu/gem5/m5out")
 
 print("Beginning simulation!")
 exit_event = m5.simulate()
 
 print('Exiting @ tick {} because {}'
       .format(m5.curTick(), exit_event.getCause()))
+
+#If the simulation decides to exit due to checkpoint, then resume simulation afterwards
+if exit_event.getCause() == "checkpoint":
+    
+    if args.checkpoint_dir:
+        #Perform the checkpoint
+        m5.checkpoint(args.checkpoint_dir)
+
+    print('Resuming simulation')
+    exit_event = m5.simulate()
+
+    print('Exiting @ tick {} because {}'
+          .format(m5.curTick(), exit_event.getCause()))
+
+    print(exit_event.getCode())
