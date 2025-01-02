@@ -310,6 +310,7 @@ Ramulator2::drain()
 {
     // check our outstanding reads and writes and if any they need to
     // drain
+    DPRINTF(Drain, "Draining Ramulator\n");
     return nbrOutstanding() != 0 ? DrainState::Draining : DrainState::Drained;
 }
 
