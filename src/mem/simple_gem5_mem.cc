@@ -17,9 +17,7 @@ SimpleGem5Mem::SimpleGem5Mem(const Params &p)
     // Set the ticks_per_ns parameter in the simulator
     smem.set_ticks_per_ns(sim_clock::as_float::ns);
     smem.set_tclk(p.tck);
-    registerExitCallback([this]() {
-        smem.finalize();
-    });
+    registerExitCallback([this]() { smem.finalize(); });
 }
 
 void SimpleGem5Mem::init() {
@@ -47,15 +45,19 @@ void SimpleGem5Mem::sendResponse() {
     assert(!retryResp);
     assert(!responseQueue.empty());
 
-    DPRINTF(SimpleGem5Mem, "Attempting to send response\n");
+    // DPRINTF(SimpleGem5Mem, "Attempting to send response\n");
+    DPRINTF(SimpleGem5Mem, "Starting %s\n", __func__);
 
     bool success = port.sendTimingResp(responseQueue.front());
     if (success) {
+        PacketPtr p = responseQueue.front();
+        DPRINTF(SimpleGem5Mem, "Sent resp for addr:  %#x, %s\n", p->getAddr(),
+                (p->isRead() ? "R" : "W"));
         responseQueue.pop_front();
 
-        DPRINTF(
-            SimpleGem5Mem, "Have %d read, %d write, %d responses outstanding\n",
-            nbrOutstandingReads, nbrOutstandingWrites, responseQueue.size());
+        // DPRINTF(
+        // SimpleGem5Mem, "Have %d read, %d write, %d responses outstanding\n",
+        // nbrOutstandingReads, nbrOutstandingWrites, responseQueue.size());
 
         if (!responseQueue.empty() && !sendResponseEvent.scheduled())
             schedule(sendResponseEvent, curTick());
@@ -65,19 +67,22 @@ void SimpleGem5Mem::sendResponse() {
     } else {
         retryResp = true;
 
-        DPRINTF(SimpleGem5Mem, "Waiting for response retry\n");
+        DPRINTF(SimpleGem5Mem, "Need to retry sending resp\n");
 
         assert(!sendResponseEvent.scheduled());
     }
+    DPRINTF(SimpleGem5Mem, "Finished %s\n", __func__);
 }
 
 unsigned int SimpleGem5Mem::nbrOutstanding() const {
-    return nbrOutstandingReads + nbrOutstandingWrites + responseQueue.size();
+    return pending_reads.size() + pending_writes.size();
+    // return nbrOutstandingReads + nbrOutstandingWrites + responseQueue.size();
 }
 
 void SimpleGem5Mem::tick() {
 
     // DPRINTF(SimpleGem5Mem, "Mem update\n");
+    // DPRINTF(SimpleGem5Mem, "Started %s\n", __func__);
 
     // Only tick when it's timing mode
     if (system()->isTimingMode()) {
@@ -87,12 +92,18 @@ void SimpleGem5Mem::tick() {
         // is the connected port waiting for a retry, if so check the
         // state and send a retry if conditions have changed
         if (retryReq) {
+            DPRINTF(SimpleGem5Mem, "Mem sent retryReq\n");
             retryReq = false;
             port.sendRetryReq();
         }
     }
 
     schedule(tickEvent, curTick() + smem.get_tclk() * sim_clock::as_float::ns);
+
+    if (nbrOutstanding() == 0)
+        signalDrainDone();
+
+    // DPRINTF(SimpleGem5Mem, "Finished %s\n", __func__);
 }
 
 Tick SimpleGem5Mem::recvAtomic(PacketPtr pkt) {
@@ -114,8 +125,9 @@ void SimpleGem5Mem::recvFunctional(PacketPtr pkt) {
 }
 
 bool SimpleGem5Mem::recvTimingReq(PacketPtr pkt) {
-    DPRINTF(SimpleGem5Mem, "recvTimingReq: request %s addr %#x size %d\n",
-            pkt->cmdString(), pkt->getAddr(), pkt->getSize());
+    DPRINTF(SimpleGem5Mem, "recvTimingReq: %d request %s addr %#x size %d, type %s\n",
+            req_id, pkt->cmdString(), pkt->getAddr(), pkt->getSize(), (pkt->isRead()?"R":(pkt->isWrite()?"W":"Unknown Op")));
+    DPRINTF(SimpleGem5Mem, "Current simplemem buffer occupancy %d\n",smem.buffer_occupancy());
 
     panic_if(pkt->cacheResponding(), "Should not see packets where cache "
                                      "is responding");
@@ -128,84 +140,121 @@ bool SimpleGem5Mem::recvTimingReq(PacketPtr pkt) {
     // we should not get a new request after committing to retry the
     // current one, but unfortunately the CPU violates this rule, so
     // simply ignore it for now
-    if (retryReq)
+    if (retryReq) {
+        DPRINTF(SimpleGem5Mem, "Already have a req that needs to be retried, "
+                               "so not accepting this req\n");
         return false;
-
+    }
+    // This variable will be set to true if SimpleMem accepts the request. The
+    // only reason it might not accept the request is if ran out of space in the
+    // buffer
     bool enqueue_success = false;
     if (pkt->isRead()) {
         // Generate SimpleMem READ request and try to send to memory system
+        // Create the request (id, addr, callback)
         simple_mem::Req req(req_id, pkt->getAddr(), simple_mem::OpType::READ);
         enqueue_success =
             smem.add_req_external(req, curTick(), [this](simple_mem::Req &req) {
-                DPRINTF(SimpleGem5Mem, "Read to :%ld:%#lx completed.\n", req.id, req.addr);
-                auto &pkt_q = outstandingReads.find(req.addr)->second;
-                PacketPtr pkt = pkt_q.front();
-                pkt_q.pop_front();
-                if (!pkt_q.size())
-                    outstandingReads.erase(req.addr);
+                DPRINTF(SimpleGem5Mem, "Read to %ld,%#lx,%s completed.\n", req.id,
+                        req.addr,(req.op==simple_mem::OpType::READ?"R":"W"));
+                panic_if(pending_reads.find(req.id) == pending_reads.end(),
+                         "Req %ld to addr %#x not found in pending reads\n", req.id, req.addr);
+                PacketPtr pkt = pending_reads.find(req.id)->second; 
+                // auto &pkt_q = outstandingReads.find(req.addr)->second;
+                // PacketPtr pkt = pkt_q.front();
+                // pkt_q.pop_front();
+                // if (!pkt_q.size())
+                // outstandingReads.erase(req.addr);
+
+                // Access the packet and try to send the response back
+                accessAndRespond(pkt);
+
+                // Remove the entry from the pending reads structure
+                pending_reads.erase(req.id);
+                DPRINTF(SimpleGem5Mem, "Removed reqid: %d from pending reads\n", req.id);
 
                 // added counter to track requests in flight
-                --nbrOutstandingReads;
-
-                accessAndRespond(pkt);
+                // --nbrOutstandingReads;
             });
 
         if (enqueue_success) {
-            outstandingReads[pkt->getAddr()].push_back(pkt);
+            // Add this request to the pending reads structure
+            panic_if(pending_reads.find(req.id) != pending_reads.end(),
+                     "Req %ld already exists\n", req.id);
+            auto emplace_result = pending_reads.emplace(req.id, pkt);
+            panic_if(!emplace_result.second,"Placing pkt did not succeed\n");
+            //Retrieve entry we just added to verify
+            DPRINTF(SimpleGem5Mem,"Req ID: %d, Addr %#x added to pending reads\n",emplace_result.first->first,emplace_result.first->second->getAddr());
+            // outstandingReads[pkt->getAddr()].push_back(pkt);
 
             // we count a transaction as outstanding until it has left the
             // queue in the controller, and the response has been sent
             // back, note that this will differ for reads and writes
-            ++nbrOutstandingReads;
+            // ++nbrOutstandingReads;
         } else {
             retryReq = true;
         }
     } else if (pkt->isWrite()) {
-        // Generate ramulator WRITE request and try to send to ramulator's
-        // memory system
+        // Generate SimpleMem READ request and try to send to memory system
+        // Create the request (id, addr, callback)
         simple_mem::Req req(req_id, pkt->getAddr(), simple_mem::OpType::WRITE);
         enqueue_success =
             smem.add_req_external(req, curTick(), [this](simple_mem::Req &req) {
-                DPRINTF(SimpleGem5Mem, "Write to %ld completed.\n", req.addr);
-                auto &pkt_q = outstandingWrites.find(req.addr)->second;
-                PacketPtr pkt = pkt_q.front();
-                pkt_q.pop_front();
-                if (!pkt_q.size())
-                    outstandingWrites.erase(req.addr);
+                DPRINTF(SimpleGem5Mem, "Write to %ld,%#lx,%s completed.\n",
+                        req.id, req.addr, (req.op==simple_mem::OpType::READ?"R":"W"));
+                panic_if(pending_writes.find(req.id) == pending_writes.end(),
+                         "Req %ld to addr %#x not found in pending writes\n", req.id, req.addr);
+                DPRINTF(SimpleGem5Mem, "B1\n");
+                PacketPtr pkt = pending_writes.find(req.id)->second;
+                DPRINTF(SimpleGem5Mem, "B2\n");
+                // auto &pkt_q = outstandingReads.find(req.addr)->second;
+                // PacketPtr pkt = pkt_q.front();
+                // pkt_q.pop_front();
+                // if (!pkt_q.size())
+                // outstandingReads.erase(req.addr);
+
+                // Access the packet and try to send the response back
+                accessAndRespond(pkt);
+                DPRINTF(SimpleGem5Mem, "B3\n");
+                // Remove the entry from the pending reads structure
+                pending_writes.erase(req.id);
+                DPRINTF(SimpleGem5Mem, "Removed reqid: %d from pending writes\n", req.id);
+                DPRINTF(SimpleGem5Mem, "B4\n");
+
 
                 // added counter to track requests in flight
-                --nbrOutstandingWrites;
-
-                accessAndRespond(pkt);
+                // --nbrOutstandingReads;
             });
 
         if (enqueue_success) {
-            outstandingWrites[pkt->getAddr()].push_back(pkt);
+            // Add this request to the pending reads structure
+            panic_if(pending_writes.find(req.id) != pending_writes.end(),
+                     "Req %ld already exists\n", req.id);
+            
+            auto emplace_result = pending_writes.emplace(req.id, pkt);
+            panic_if(!emplace_result.second,"Placing pkt did not succeed\n");
+            //Retrieve entry we just added to verify
+            DPRINTF(SimpleGem5Mem,"Req ID: %d, Addr %#x added to pending writes\n",emplace_result.first->first,emplace_result.first->second->getAddr());
+            // outstandingReads[pkt->getAddr()].push_back(pkt);
 
-            ++nbrOutstandingWrites;
-
-            // perform the access for writes
-            accessAndRespond(pkt);
+            // we count a transaction as outstanding until it has left the
+            // queue in the controller, and the response has been sent
+            // back, note that this will differ for reads and writes
+            // ++nbrOutstandingReads;
         } else {
             retryReq = true;
         }
-    } else {
-        // keep it simple and just respond if necessary
-        accessAndRespond(pkt);
-        return true;
     }
-
     if (enqueue_success) {
         DPRINTF(SimpleGem5Mem, "Successfully added req %#x to memory\n",
                 pkt->getAddr());
         req_id++;
     }
-
     return enqueue_success;
 }
 
 void SimpleGem5Mem::recvRespRetry() {
-    DPRINTF(SimpleGem5Mem, "Retrying\n");
+    DPRINTF(SimpleGem5Mem, "Retrying sending response\n");
 
     assert(retryResp);
     retryResp = false;
@@ -213,7 +262,7 @@ void SimpleGem5Mem::recvRespRetry() {
 }
 
 void SimpleGem5Mem::accessAndRespond(PacketPtr pkt) {
-    DPRINTF(SimpleGem5Mem, "Access for address %lld\n", pkt->getAddr());
+    DPRINTF(SimpleGem5Mem, "Access for address %#x\n", pkt->getAddr());
 
     bool needsResponse = pkt->needsResponse();
 
@@ -229,7 +278,7 @@ void SimpleGem5Mem::accessAndRespond(PacketPtr pkt) {
         // Here we reset the timing of the packet before sending it out.
         pkt->headerDelay = pkt->payloadDelay = 0;
 
-        DPRINTF(SimpleGem5Mem, "Queuing response for address %lld\n",
+        DPRINTF(SimpleGem5Mem, "Queuing response for address %#x\n",
                 pkt->getAddr());
 
         // queue it to be sent back
@@ -241,6 +290,7 @@ void SimpleGem5Mem::accessAndRespond(PacketPtr pkt) {
             schedule(sendResponseEvent, time);
     } else {
         // queue the packet for deletion
+        DPRINTF(SimpleGem5Mem, "Deleting packet for addr %#x\n",pkt->getAddr());
         pendingDelete.reset(pkt);
     }
 }
