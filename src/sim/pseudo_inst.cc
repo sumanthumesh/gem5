@@ -357,6 +357,7 @@ void
 m5checkpoint(ThreadContext *tc, Tick delay, Tick period)
 {
     DPRINTF(PseudoInst, "pseudo_inst::m5checkpoint(%i, %i)\n", delay, period);
+    std::cout<<"Checkpoint invoked at tick: "<<curTick()<<"\n";
     if (!tc->getCpuPtr()->params().do_checkpoint_insts)
         return;
 
