@@ -119,7 +119,9 @@ if args.checkpoint_dir:
     system.mem_ctrl.port = system.membus.mem_side_ports
 else:
     system.mem_ctrl = Ramulator2()
-    system.mem_ctrl.config_path = "/data1/sumanthu/gem5/ext/ramulator2/ramulator2/example_config.yaml"
+    system.mem_ctrl.config_path = (
+        "/data1/sumanthu/gem5/ext/ramulator2/ramulator2/example_config.yaml"
+    )
     system.mem_ctrl.range = system.mem_ranges[0]
     system.mem_ctrl.port = system.membus.mem_side_ports
 
@@ -159,9 +161,7 @@ else:
 print("Beginning simulation!")
 exit_event = m5.simulate()
 
-print(
-    f"Exiting @ tick {m5.curTick()} because {exit_event.getCause()}"
-)
+print(f"Exiting @ tick {m5.curTick()} because {exit_event.getCause()}")
 
 # If the simulation decides to exit due to checkpoint, then resume simulation afterwards
 if exit_event.getCause() == "checkpoint":
