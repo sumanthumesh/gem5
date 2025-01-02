@@ -128,7 +128,7 @@ InvalidOpcode::invoke(ThreadContext *tc, const StaticInstPtr &inst)
         X86Fault::invoke(tc, inst);
     } else {
         auto *xsi = static_cast<X86StaticInst *>(inst.get());
-        panic("Unrecognized/invalid instruction executed:\n %s",
+        panic("Unrecognized/invalid instruction executed at PC:%#x :\n %s",tc->pcState().instAddr(),
                 xsi->machInst);
     }
 }
