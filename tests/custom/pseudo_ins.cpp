@@ -12,7 +12,7 @@ int main(int argc, char *argv[])
     uint64_t start = reinterpret_cast<uint64_t>(v.data());
     uint64_t end = start+v.size()*sizeof(int);
 
-    m5_add_mem_region(start,end);
+    m5_add_mem_region(4,start,end);
 
     std::cout<<"After mem region"<<std::endl;
 

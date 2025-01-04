@@ -106,7 +106,7 @@ void resetstats(ThreadContext *tc, Tick delay, Tick period);
 void dumpstats(ThreadContext *tc, Tick delay, Tick period);
 void dumpresetstats(ThreadContext *tc, Tick delay, Tick period);
 void m5checkpoint(ThreadContext *tc, Tick delay, Tick period);
-void m5addmemregion(ThreadContext *tc, uint64_t start, uint64_t end);
+void m5addmemregion(ThreadContext *tc, size_t uniq_id, uint64_t start, uint64_t end);
 void debugbreak(ThreadContext *tc);
 void switchcpu(ThreadContext *tc);
 void workbegin(ThreadContext *tc, uint64_t workid, uint64_t threadid);

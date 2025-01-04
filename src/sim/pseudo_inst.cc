@@ -553,12 +553,13 @@ workbegin(ThreadContext *tc, uint64_t workid, uint64_t threadid)
 }
 
 void
-m5addmemregion(ThreadContext *tc, uint64_t start, uint64_t end)
+m5addmemregion(ThreadContext *tc, size_t uniq_id, uint64_t start, uint64_t end)
 {
     DPRINTF(PseudoInst, "pseudo_inst::m5addmemregion\n");
     std::cout<<"Inst invoked at tick: "<<curTick()<<"\n";
     std::cout<<"Start:"<<start<<"\n";
     std::cout<<"End:"<<end<<"\n";
+    std::cout<<"Column ID:"<<uniq_id<<"\n";
     return;
 }
 
