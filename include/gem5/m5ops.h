@@ -29,6 +29,8 @@
 #ifndef __GEM5_M5OP_H__
 #define __GEM5_M5OP_H__
 
+#include <string>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -64,6 +66,7 @@ void m5_dist_toggle_sync(void);
 void m5_add_symbol(uint64_t addr, const char *symbol);
 void m5_load_symbol();
 void m5_panic(void);
+void m5_add_mem_region(uint64_t start, uint64_t end);
 void m5_work_begin(uint64_t workid, uint64_t threadid);
 void m5_work_end(uint64_t workid, uint64_t threadid);
 

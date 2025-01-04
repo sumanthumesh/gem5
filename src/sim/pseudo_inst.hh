@@ -106,6 +106,7 @@ void resetstats(ThreadContext *tc, Tick delay, Tick period);
 void dumpstats(ThreadContext *tc, Tick delay, Tick period);
 void dumpresetstats(ThreadContext *tc, Tick delay, Tick period);
 void m5checkpoint(ThreadContext *tc, Tick delay, Tick period);
+void m5addmemregion(ThreadContext *tc, uint64_t start, uint64_t end);
 void debugbreak(ThreadContext *tc);
 void switchcpu(ThreadContext *tc);
 void workbegin(ThreadContext *tc, uint64_t workid, uint64_t threadid);
@@ -225,6 +226,10 @@ pseudoInstWork(ThreadContext *tc, uint8_t func, uint64_t &result)
       case M5OP_PANIC:
         panic("M5 panic instruction called at %s\n", tc->pcState());
 
+      case M5OP_ADD_MEM_REGION:
+        invokeSimcall<ABI>(tc, m5addmemregion);
+        return true;
+
       case M5OP_WORK_BEGIN:
         invokeSimcall<ABI>(tc, workbegin);
         return true;
@@ -237,7 +242,7 @@ pseudoInstWork(ThreadContext *tc, uint8_t func, uint64_t &result)
       case M5OP_RESERVED2:
       case M5OP_RESERVED3:
       case M5OP_RESERVED4:
-      case M5OP_RESERVED5:
+    //   case M5OP_RESERVED5:
         warn("Unimplemented m5 op (%#x)\n", func);
         return false;
 

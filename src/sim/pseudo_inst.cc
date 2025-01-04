@@ -552,6 +552,16 @@ workbegin(ThreadContext *tc, uint64_t workid, uint64_t threadid)
     }
 }
 
+void
+m5addmemregion(ThreadContext *tc, uint64_t start, uint64_t end)
+{
+    DPRINTF(PseudoInst, "pseudo_inst::m5addmemregion\n");
+    std::cout<<"Inst invoked at tick: "<<curTick()<<"\n";
+    std::cout<<"Start:"<<start<<"\n";
+    std::cout<<"End:"<<end<<"\n";
+    return;
+}
+
 //
 // This function is executed when annotated work items end.  Depending on
 // what the user specified at the command line, the simulation may exit and/or

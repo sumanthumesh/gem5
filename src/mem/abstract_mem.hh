@@ -52,6 +52,9 @@
 #include "sim/clocked_object.hh"
 #include "sim/stats.hh"
 
+#include <string>
+#include <unordered_map>
+
 namespace gem5
 {
 
