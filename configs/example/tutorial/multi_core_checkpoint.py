@@ -32,7 +32,7 @@ parser.add_argument(
 parser.add_argument(
     "--no-cache",
     help="Instantiate system without any cache",
-    action="store_true"
+    action="store_true",
 )
 
 
