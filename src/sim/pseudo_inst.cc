@@ -555,11 +555,15 @@ workbegin(ThreadContext *tc, uint64_t workid, uint64_t threadid)
 void
 m5addmemregion(ThreadContext *tc, size_t uniq_id, uint64_t start, uint64_t end)
 {
-    DPRINTF(PseudoInst, "pseudo_inst::m5addmemregion\n");
-    std::cout<<"Inst invoked at tick: "<<curTick()<<"\n";
-    std::cout<<"Start:"<<start<<"\n";
-    std::cout<<"End:"<<end<<"\n";
-    std::cout<<"Column ID:"<<uniq_id<<"\n";
+    DPRINTF(PseudoInst, "pseudo_inst::m5addmemregion @%lld\n",curTick());
+    DPRINTF(PseudoInst, "%d,%#llx,%#llx\n",uniq_id,start,end);
+
+    //When adding the memory region we will record the exact start and end address given by the program
+    //We dont consider whether the addresses align to a cacheline boundary or not
+    //Get access to the special address regions structure from system
+    auto addr_regions = tc->getSystemPtr()->get_special_addr_regions();
+    addr_regions->insert({start,std::make_pair(end,uniq_id)});
+    std::cout<<std::hex<<uniq_id<<":0x"<<start<<",0x"<<end<<"\n";
     return;
 }
 

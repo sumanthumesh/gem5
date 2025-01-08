@@ -117,8 +117,17 @@ class SimpleGem5Mem : public AbstractMemory {
 	//To hold request ID
 	uint64_t req_id;
 
+    /**
+     * List of special address regions
+     */
+    std::map<uint64_t,std::pair<uint64_t, size_t>> *addr_regions;
+
+    //Number of accesses to said regions
+    std::map<size_t,size_t> region_counts;
+
   public:
-    typedef SimpleGem5MemParams Params;
+    PARAMS(SimpleGem5Mem);
+    // typedef SimpleGem5MemParams Params;
     SimpleGem5Mem(const Params &p);
 
     DrainState drain() override;
@@ -136,6 +145,8 @@ class SimpleGem5Mem : public AbstractMemory {
     void recvFunctional(PacketPtr pkt);
     bool recvTimingReq(PacketPtr pkt);
     void recvRespRetry();
+
+    std::vector<size_t> find_special_addr_region(uint64_t addr, size_t size);
 };
 
 } // namespace memory

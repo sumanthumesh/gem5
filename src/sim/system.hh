@@ -325,6 +325,14 @@ class System : public SimObject, public PCEventScope
     /** OS kernel */
     Workload *workload = nullptr;
 
+    /**
+     * This data structure stores address ranges as specified by the m5_add_mem_region API
+     * The key is the start of the address range. The value is a pair <end value, unique id>
+     * This map will need to accessible to the memory when needed
+     */
+
+    std::map<uint64_t, std::pair<uint64_t, size_t>> addr_regions;
+
   public:
     /**
      * Get a pointer to the Kernel Virtual Machine (KVM) SimObject,
@@ -373,6 +381,11 @@ class System : public SimObject, public PCEventScope
      * Return a pointer to the device memory.
      */
     memory::AbstractMemory *getDeviceMemory(const PacketPtr& pkt) const;
+
+    /**
+     * Return a pointer to data structure holding the special address regions indicated by the m5_add_mem_region API
+     */
+    std::map<uint64_t,std::pair<uint64_t,size_t>> *get_special_addr_regions() {return &addr_regions;}
 
     /*
      * Return the list of address ranges backed by a shadowed ROM.

@@ -1,6 +1,7 @@
 from m5.SimObject import *
 from m5.params import *
 from m5.objects.AbstractMemory import *
+from m5.proxy import Parent
 
 class SimpleGem5Mem(AbstractMemory):
   type = "SimpleGem5Mem"
@@ -9,4 +10,6 @@ class SimpleGem5Mem(AbstractMemory):
 
   port = ResponsePort("The port for receiving memory requests and sending responses")
   tck = Param.Float("DRAM clock period in ns")
+
+#   system = Param.System(Parent.any, "System this memory is part of")
   
