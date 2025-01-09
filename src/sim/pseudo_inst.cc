@@ -47,6 +47,7 @@
 
 #include <array>
 #include <cerrno>
+#include <filesystem>
 #include <fstream>
 #include <string>
 #include <vector>
@@ -489,6 +490,27 @@ void m5addmemregion(ThreadContext *tc, size_t uniq_id, uint64_t start, uint64_t 
     auto addr_regions = tc->getSystemPtr()->get_special_addr_regions();
     addr_regions->insert({start, std::make_pair(end, uniq_id)});
     // std::cout << uniq_id << std::hex << ":0x" << start << ",0x" << end << "\n";
+    return;
+}
+
+void m5dumpmemregion(ThreadContext *tc) {
+    DPRINTF(PseudoInst, "pseudo_inst::m5dumpmemregion @%lld\n", curTick());
+
+    //Dump all the values we got from the add memory regions into a file which can be loaded later
+
+    std::filesystem::path cwd = std::filesystem::current_path();
+    std::filesystem::path dump_file = cwd / "mem_regions.dat";
+
+    std::ofstream f(dump_file.string());
+
+    std::cout<<"Mem regions written to "<<dump_file<<std::endl;
+
+    auto addr_regions = tc->getSystemPtr()->get_special_addr_regions();
+
+    for(auto it=addr_regions->begin();it!=addr_regions->end();it++)
+    {
+        f << it->second.second << std::hex << ":0x" << it->first << ",0x" << it->second.first << "\n";
+    }
     return;
 }
 

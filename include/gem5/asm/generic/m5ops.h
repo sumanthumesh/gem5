@@ -70,7 +70,7 @@
 #define M5OP_RESERVED1          0x55 // Reserved for user, used to be annotate
 #define M5OP_RESERVED2          0x56 // Reserved for user
 #define M5OP_RESERVED3          0x57 // Reserved for user
-#define M5OP_RESERVED4          0x58 // Reserved for user
+#define M5OP_DUMP_MEM_REGION    0x58 // Reserved for user
 #define M5OP_ADD_MEM_REGION     0x59 // Reserved for user
 
 #define M5OP_WORK_BEGIN         0x5a
@@ -104,6 +104,7 @@
     M5OP(m5_switch_cpu, M5OP_SWITCH_CPU)                        \
     M5OP(m5_add_symbol, M5OP_ADD_SYMBOL)                        \
     M5OP(m5_panic, M5OP_PANIC)                                  \
+    M5OP(m5_dump_mem_region, M5OP_DUMP_MEM_REGION)              \
     M5OP(m5_add_mem_region, M5OP_ADD_MEM_REGION)                \
     M5OP(m5_work_begin, M5OP_WORK_BEGIN)                        \
     M5OP(m5_work_end, M5OP_WORK_END)                            \
