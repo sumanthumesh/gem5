@@ -139,6 +139,11 @@ if env['HAVE_SIMPLEMEM']:
   Source('simple_gem5_mem.cc')
   DebugFlag("SimpleGem5Mem")
 
+if env['HAVE_CXLSIM']:
+  SimObject('CXLSimGem5.py', sim_objects=['CXLSimGem5'])
+  Source('cxlsim_gem5.cc')
+  DebugFlag("CXLSimGem5")
+
 SimObject('MemChecker.py', sim_objects=['MemChecker', 'MemCheckerMonitor'])
 Source('mem_checker.cc')
 Source('mem_checker_monitor.cc')

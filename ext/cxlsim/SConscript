@@ -14,5 +14,7 @@ env.Append(
   LIBPATH=[cxlsim_path],
   RPATH=[cxlsim_path],
   CPPPATH=[
-  cxlsim_path
+  cxlsim_path,
+  cxlsim_path+'/include',
+  cxlsim_path+'/ramulator/src'
 ])
