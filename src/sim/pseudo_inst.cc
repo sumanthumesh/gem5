@@ -493,24 +493,93 @@ void m5addmemregion(ThreadContext *tc, size_t uniq_id, uint64_t start, uint64_t 
     return;
 }
 
-void m5dumpmemregion(ThreadContext *tc) {
+void m5memregioncmd(ThreadContext *tc, size_t n) {
     DPRINTF(PseudoInst, "pseudo_inst::m5dumpmemregion @%lld\n", curTick());
 
-    //Dump all the values we got from the add memory regions into a file which can be loaded later
+    // Either dump or load special regions from file
 
     std::filesystem::path cwd = std::filesystem::current_path();
     std::filesystem::path dump_file = cwd / "mem_regions.dat";
 
-    std::ofstream f(dump_file.string());
-
-    std::cout<<"Mem regions written to "<<dump_file<<std::endl;
-
     auto addr_regions = tc->getSystemPtr()->get_special_addr_regions();
 
-    for(auto it=addr_regions->begin();it!=addr_regions->end();it++)
+    // Helper function
+    auto splitString = [](const std::string &str, char delimiter) {
+        std::vector<std::string> result;
+        std::stringstream ss(str); // Use stringstream for parsing the string
+        std::string token;
+
+        while (std::getline(ss, token, delimiter)) {
+            result.push_back(token);
+        }
+
+        return result;
+    };
+
+    auto isValidHexForUint64 =
+        [](const std::string &hexString) {
+            try {
+                // Attempt to convert the string to an unsigned long long with base 16
+                unsigned long long value = std::stoull(hexString, nullptr, 16);
+
+                // Check if the value fits within uint64_t
+                if (value > std::numeric_limits<uint64_t>::max()) {
+                    return false;
+                }
+                return true;
+            } catch (const std::invalid_argument &) {
+                // The string is not a valid number
+                return false;
+            } catch (const std::out_of_range &) {
+                // The number is too large to fit in unsigned long long
+                return false;
+            }
+        };
+
+    switch (n) {
+    case 0: // Dump files
     {
-        f << it->second.second << std::hex << ":0x" << it->first << ",0x" << it->second.first << "\n";
+        std::cout << "Writing mem regions to " << dump_file << std::endl;
+
+        std::ofstream f(dump_file.string());
+        for (auto it = addr_regions->begin(); it != addr_regions->end(); it++) {
+            f << std::dec << it->second.second << std::hex << ",0x" << it->first << ",0x" << it->second.first << "\n";
+        }
+        std::cout << "Finished writing " << addr_regions->size() << " entries to file" << std::endl;
+        break;
     }
+    case 1: // Load from file
+    {
+        std::ifstream f(dump_file.string());
+
+        std::string line;
+
+        std::cout << "Loading mem regions from " << dump_file << std::endl;
+        while (std::getline(f, line)) {
+            // The input will look like
+            // 1,0xa,0xb
+            // 1 is the region id. Unique to every memory region
+            // 0xa is the starteing address and 0xb is the ending address
+            // The memory region is [0xa,0xb), where 0xb is not inclusive
+            auto s = splitString(line, ',');
+            panic_if(s.size() != 3, "Expected three comma separated values, received %d", s.size());
+            size_t region_id = std::stoull(s[0]);
+            uint64_t start = std::stoull(s[1], nullptr, 16);
+            // Remove new line for the last value
+            s[2].erase(std::remove(s[2].begin(), s[2].end(), '\n'), s[2].end());
+            uint64_t end = std::stoull(s[2], nullptr, 16);
+            // Add it to the memory regions
+            addr_regions->insert({start, std::make_pair(end, region_id)});
+        }
+
+        std::cout << "Finished loading " << addr_regions->size() << " from file" << std::endl;
+        break;
+    }
+    default: {
+        panic_if(true, "Unknown command %d", n);
+    }
+    }
+
     return;
 }
 

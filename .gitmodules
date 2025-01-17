@@ -4,3 +4,6 @@
 [submodule "ext/simple_mem/simple_mem"]
 	path = ext/simple_mem/simple_mem
 	url = git@github.com:sumanthumesh/analytical_model.git
+[submodule "ext/cxlsim/cxlsim"]
+	path = ext/cxlsim/cxlsim
+	url = git@bitbucket.org:sumanthu0/cxlsim_gem5.git

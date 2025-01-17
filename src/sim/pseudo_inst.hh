@@ -92,7 +92,7 @@ void resetstats(ThreadContext *tc, Tick delay, Tick period);
 void dumpstats(ThreadContext *tc, Tick delay, Tick period);
 void dumpresetstats(ThreadContext *tc, Tick delay, Tick period);
 void m5checkpoint(ThreadContext *tc, Tick delay, Tick period);
-void m5dumpmemregion(ThreadContext *tc);
+void m5memregioncmd(ThreadContext *tc, size_t n);
 void m5addmemregion(ThreadContext *tc, size_t uniq_id, uint64_t start, uint64_t end);
 void debugbreak(ThreadContext *tc);
 void switchcpu(ThreadContext *tc);
@@ -209,8 +209,8 @@ template <typename ABI, bool store_ret> bool pseudoInstWork(ThreadContext *tc, u
     case M5OP_PANIC:
         panic("M5 panic instruction called at %s\n", tc->pcState());
 
-    case M5OP_DUMP_MEM_REGION:
-        invokeSimcall<ABI>(tc, m5dumpmemregion);
+    case M5OP_MEM_REGION_CMD:
+        invokeSimcall<ABI>(tc, m5memregioncmd);
         return true;
 
     case M5OP_ADD_MEM_REGION:
