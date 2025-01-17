@@ -15,6 +15,9 @@ CXLSimGem5::CXLSimGem5(const Params &p)
     // Set the ticks_per_ns parameter in the simulator
     smem.set_ticks_per_ns(sim_clock::as_float::ns);
     smem.set_tclk(p.tck);
+    // Refresh the parameters
+    CXL::params.recalculate();
+    // Register exit callback
     registerExitCallback([this]() {
         smem.finalize();
         for (auto &v : this->region_counts) {
@@ -102,7 +105,7 @@ void CXLSimGem5::tick() {
     // Only tick when it's timing mode
     if (system()->isTimingMode()) {
         // ramulator2_memorysystem->tick();
-        smem.update(curTick());
+        smem.sys->update();
 
         // is the connected port waiting for a retry, if so check the
         // state and send a retry if conditions have changed
@@ -113,7 +116,8 @@ void CXLSimGem5::tick() {
         }
     }
 
-    schedule(tickEvent, curTick() + smem.get_tclk() * sim_clock::as_float::ns);
+    // schedule(tickEvent, curTick() + smem.get_tclk() * sim_clock::as_float::ns);
+    schedule(tickEvent, curTick() + smem.find_next_tick(curTick()));
 
     if (nbrOutstanding() == 0)
         signalDrainDone();
@@ -142,7 +146,6 @@ void CXLSimGem5::recvFunctional(PacketPtr pkt) {
 bool CXLSimGem5::recvTimingReq(PacketPtr pkt) {
     DPRINTF(CXLSimGem5, "recvTimingReq: %d request %s addr %#x size %d, type %s\n", req_id, pkt->cmdString(),
             pkt->getAddr(), pkt->getSize(), (pkt->isRead() ? "R" : (pkt->isWrite() ? "W" : "Unknown Op")));
-    DPRINTF(CXLSimGem5, "Current simplemem buffer occupancy %d\n", smem.buffer_occupancy());
 
     panic_if(pkt->cacheResponding(), "Should not see packets where cache "
                                      "is responding");
@@ -177,6 +180,9 @@ bool CXLSimGem5::recvTimingReq(PacketPtr pkt) {
     }
 
     bool enqueue_success = false;
+
+
+
     if (pkt->isRead()) {
         // Generate SimpleMem READ request and try to send to memory system
         // Create the request (id, addr, callback)

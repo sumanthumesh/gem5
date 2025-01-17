@@ -7,7 +7,7 @@
 
 #include "mem/abstract_mem.hh"
 #include "params/CXLSimGem5.hh"
-#include "simple_mem/simple_mem.hh"
+#include "cxlsim/cxlsim/include/CXLWrapper.h"
 
 // Forward declare SimpleMem
 // namespace simple_mem {
@@ -52,7 +52,7 @@ class CXLSimGem5 : public AbstractMemory {
     MemorySystemPort port;
 
     std::string config_path;
-    simple_mem::SimpleMem smem;
+    CXL::CXLWrapper smem;
 
     // std::function<void(Ramulator::Request&)> read_callback;
     // std::function<void(Ramulator::Request&)> write_callback;
