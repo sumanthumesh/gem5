@@ -1,0 +1,18 @@
+import os
+
+Import('env')
+
+if not os.path.exists(Dir('.').srcnode().abspath + '/cxlsim'):
+  env['HAVE_CXLSIM'] = False
+  Return()
+
+env['HAVE_CXLSIM'] = True
+cxlsim_path = os.path.join(Dir('#').abspath, 'ext/cxlsim/cxlsim')
+env.Prepend(CPPPATH=Dir('.').srcnode())
+env.Append(
+  LIBS=['cxlsim'],
+  LIBPATH=[cxlsim_path],
+  RPATH=[cxlsim_path],
+  CPPPATH=[
+  cxlsim_path
+])
