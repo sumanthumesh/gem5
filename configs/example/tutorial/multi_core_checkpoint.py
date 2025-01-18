@@ -75,7 +75,8 @@ else:
 # system.cpus = [TimingSimpleCPU(cpu_id=i) for i in range(NUM_CORES)]
 
 if not args.no_cache:
-    system.l3cache = L3Cache(size="8MB", assoc=16)  # Shared L3 cache
+    # system.l3cache = L3Cache(size="8MB", assoc=16)  # Shared L3 cache
+    system.l3cache = L3Cache(size="16kB", assoc=16)  # Shared L3 cache
 
     system.l2_to_l3bus = SystemXBar()
 
@@ -88,15 +89,18 @@ for cpu in system.cpus:
 
     if not args.no_cache:
         # Create L1 caches (private to each core)
+        # cpu.icache = L1ICache(size="1kB", assoc=4)
+        # cpu.dcache = L1DCache(size="32kB", assoc=4)
         cpu.icache = L1ICache(size="1kB", assoc=4)
-        cpu.dcache = L1DCache(size="32kB", assoc=4)
+        cpu.dcache = L1DCache(size="1kB", assoc=4)
 
         # Connect CPU to L1
         cpu.icache_port = cpu.icache.cpu_side
         cpu.dcache_port = cpu.dcache.cpu_side
 
         # Create L2
-        cpu.l2cache = L2Cache(size="256kB", assoc=8)
+        # cpu.l2cache = L2Cache(size="256kB", assoc=8)
+        cpu.l2cache = L2Cache(size="8kB", assoc=8)
 
         # Create bus from L1 to L2
         cpu.l1_to_l2bus = L2XBar()
