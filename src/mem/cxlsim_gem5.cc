@@ -9,20 +9,26 @@ namespace memory {
 CXLSimGem5::CXLSimGem5(const Params &p)
     : AbstractMemory(p), port(name() + ".port", *this), retryReq(false), retryResp(false), startTick(0),
       nbrOutstandingReads(0), nbrOutstandingWrites(0), sendResponseEvent([this] { sendResponse(); }, name()),
-      tickEvent([this] { tick(); }, name()), req_id(0) {
+      tickEvent([this] { tick(); }, name()), req_id(0), config_path(p.config_path), inactive_cycle_count(0),
+      total_cycle_count(0) {
     DPRINTF(CXLSimGem5, "Instantiated CXLSimGem5 \n");
-
     // Set the ticks_per_ns parameter in the simulator
     smem.set_ticks_per_ns(sim_clock::as_float::ns);
     smem.set_tclk(p.tck);
     // Refresh the parameters
     CXL::params.recalculate();
+    CXL::params.print();
+    // Add the clocks
+    smem.add_clk(CXL::params.ticks_per_ns);
+    smem.add_clk(CXL::params.delay_ramulator_update);
     // Register exit callback
     registerExitCallback([this]() {
         smem.finalize();
         for (auto &v : this->region_counts) {
             std::cout << std::dec << "Region" << v.first << ":" << v.second << "\n";
         }
+        std::cout<<"Total Cycles:"<<total_cycle_count<<"\n";
+        std::cout<<"Active Cycles:"<<inactive_cycle_count<<"\n";
     });
 
     // Set the callback function
@@ -121,7 +127,10 @@ void CXLSimGem5::tick() {
     if (system()->isTimingMode()) {
         // ramulator2_memorysystem->tick();
         smem.sys->update();
-
+        // Check if this cycle is wasteful
+        if (smem.sys->hosts[0].no_active_transaction())
+            inactive_cycle_count++;
+        total_cycle_count++;
         // is the connected port waiting for a retry, if so check the
         // state and send a retry if conditions have changed
         if (retryReq) {
@@ -132,7 +141,9 @@ void CXLSimGem5::tick() {
     }
 
     // schedule(tickEvent, curTick() + smem.get_tclk() * sim_clock::as_float::ns);
-    schedule(tickEvent, curTick() + smem.find_next_tick(curTick()));
+    gem5::Tick next_tick = smem.find_next_tick(curTick());
+    // std::cout<<"Scheduling next tick for "<<next_tick<<std::endl;
+    schedule(tickEvent, next_tick);
 
     if (nbrOutstanding() == 0)
         signalDrainDone();
