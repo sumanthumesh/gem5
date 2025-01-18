@@ -62,8 +62,9 @@ class CXLSimGem5 : public AbstractMemory {
     std::unordered_map<Addr, std::deque<PacketPtr>> outstandingReads;
     std::unordered_map<Addr, std::deque<PacketPtr>> outstandingWrites;
     //Simple maps to hold outstanding requests as a req_id:pktptr pair
-    std::unordered_map<uint64_t,PacketPtr> pending_reads;
-    std::unordered_map<uint64_t,PacketPtr> pending_writes;
+    // std::unordered_map<uint64_t,PacketPtr> pending_reads;
+    // std::unordered_map<uint64_t,PacketPtr> pending_writes;
+    std::unordered_map<Addr, PacketPtr> pending_requests;
 
     /**
      * Count the number of outstanding transactions so that we can
