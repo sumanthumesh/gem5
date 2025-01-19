@@ -42,7 +42,7 @@ CXLSimGem5::CXLSimGem5(const Params &p)
         accessAndRespond(pktptr);
         // Remove the entry from pending requests
         pending_requests.erase(req_id);
-        DPRINTF(CXLSimGem5, "Removed requets %lu\n", req_id);
+        DPRINTF(CXLSimGem5, "Removed request %lu\n", req_id);
     });
 
     // if (this->system() != nullptr) {
