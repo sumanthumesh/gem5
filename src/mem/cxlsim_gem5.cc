@@ -10,7 +10,7 @@ CXLSimGem5::CXLSimGem5(const Params &p)
     : AbstractMemory(p), port(name() + ".port", *this), retryReq(false), retryResp(false), startTick(0),
       nbrOutstandingReads(0), nbrOutstandingWrites(0), sendResponseEvent([this] { sendResponse(); }, name()),
       tickEvent([this] { tick(); }, name()), req_id(0), config_path(p.config_path), inactive_cycle_count(0),
-      total_cycle_count(0) {
+      total_cycle_count(0), skip_cycle(p.skip_cycle), ramulatorEvent([this] {ramtick();}, "ramTick") {
     DPRINTF(CXLSimGem5, "Instantiated CXLSimGem5 \n");
     // Set the ticks_per_ns parameter in the simulator
     smem.set_ticks_per_ns(sim_clock::as_float::ns);
@@ -27,8 +27,8 @@ CXLSimGem5::CXLSimGem5(const Params &p)
         for (auto &v : this->region_counts) {
             std::cout << std::dec << "Region" << v.first << ":" << v.second << "\n";
         }
-        std::cout<<"Total Cycles:"<<total_cycle_count<<"\n";
-        std::cout<<"Active Cycles:"<<inactive_cycle_count<<"\n";
+        std::cout << "Total Cycles:" << total_cycle_count << "\n";
+        std::cout << "Active Cycles:" << inactive_cycle_count << "\n";
     });
 
     // Set the callback function
@@ -118,15 +118,52 @@ unsigned int CXLSimGem5::nbrOutstanding() const {
     // return nbrOutstandingReads + nbrOutstandingWrites + responseQueue.size();
 }
 
+void CXLSimGem5::ramtick(){
+    
+    // Set current tick
+    CXL::curr_tick = curTick();
+
+    // Only tick when it's timing mode
+    if (system()->isTimingMode()) {
+        // DRAM Update
+        smem.sys->hosts[0].update_DRAM();
+        // is the connected port waiting for a retry, if so check the
+        // state and send a retry if conditions have changed
+        if (retryReq) {
+            DPRINTF(CXLSimGem5, "Mem sent retryReq\n");
+            retryReq = false;
+            port.sendRetryReq();
+        }
+    }
+
+    // Schedule event at next tick
+    gem5::Tick next_tick = smem.find_next_tick(curTick());
+    // If there are no active transactions, schedule a ramtick
+    // Else schedule a full tick
+    if(skip_cycle && smem.sys->hosts[0].no_active_transaction()){
+        schedule(ramulatorEvent, next_tick);
+    }
+    else{
+        schedule(tickEvent, next_tick);
+    }
+    // std::cout<<"Scheduling next tick for "<<next_tick<<std::endl;
+
+    if (nbrOutstanding() == 0)
+        signalDrainDone();
+}
+
 void CXLSimGem5::tick() {
 
     // DPRINTF(CXLSimGem5, "Mem update\n");
     // DPRINTF(CXLSimGem5, "Started %s\n", __func__);
 
+    CXL::curr_tick = curTick();
+
     // Only tick when it's timing mode
     if (system()->isTimingMode()) {
         // ramulator2_memorysystem->tick();
         smem.sys->update();
+        smem.sys->hosts[0].update_DRAM();
         // Check if this cycle is wasteful
         if (smem.sys->hosts[0].no_active_transaction())
             inactive_cycle_count++;
@@ -140,10 +177,16 @@ void CXLSimGem5::tick() {
         }
     }
 
-    // schedule(tickEvent, curTick() + smem.get_tclk() * sim_clock::as_float::ns);
+    // Schedule event at next tick
     gem5::Tick next_tick = smem.find_next_tick(curTick());
-    // std::cout<<"Scheduling next tick for "<<next_tick<<std::endl;
-    schedule(tickEvent, next_tick);
+    // If there are no active transactions, schedule a ramtick
+    // Else schedule a full tick
+    if(skip_cycle && smem.sys->hosts[0].no_active_transaction()){
+        schedule(ramulatorEvent, next_tick);
+    }
+    else{
+        schedule(tickEvent, next_tick);
+    }
 
     if (nbrOutstanding() == 0)
         signalDrainDone();

@@ -99,11 +99,16 @@ class CXLSimGem5 : public AbstractMemory {
      * Progress the controller one clock cycle.
      */
     void tick();
+    void ramtick();
 
     /**
      * Event to schedule clock ticks
      */
     EventFunctionWrapper tickEvent;
+    /**
+     * Event to schedule ramulator ticks
+     */
+    EventFunctionWrapper ramulatorEvent;
 
     /**
      * Upstream caches need this packet until true is returned, so
@@ -122,10 +127,12 @@ class CXLSimGem5 : public AbstractMemory {
     // Number of accesses to said regions
     std::map<size_t, size_t> region_counts;
 
-    //Counter to track inactive cycles in cxlsim
+    // Counter to track inactive cycles in cxlsim
     uint64_t inactive_cycle_count;
-    //Total cycles CXLSim
+    // Total cycles CXLSim
     uint64_t total_cycle_count;
+    // Flag that tells us if we should be skipping cycles or not
+    bool skip_cycle;
 
   public:
     PARAMS(CXLSimGem5);
