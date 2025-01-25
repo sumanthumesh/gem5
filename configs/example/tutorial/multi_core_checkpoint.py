@@ -37,7 +37,7 @@ parser.add_argument(
 parser.add_argument(
     "--mem",
     help="Memory type: ramulator2, simplemem, atomicmem, cxlsim",
-    default="atomicmem"
+    default="atomicmem",
 )
 
 
@@ -130,28 +130,28 @@ if not args.no_cache:
     # Connect L3 to system bus
     system.l3cache.mem_side = system.membus.cpu_side_ports
 
-if (args.checkpoint_dir and not args.no_cache) or args.mem=="atomicmem":
+if (args.checkpoint_dir and not args.no_cache) or args.mem == "atomicmem":
     system.mem_ctrl = MemCtrl()
     system.mem_ctrl.dram = DDR3_1600_8x8()
     system.mem_ctrl.dram.range = system.mem_ranges[0]
     system.mem_ctrl.port = system.membus.mem_side_ports
-elif args.mem=="simplemem":
+elif args.mem == "simplemem":
     mem_ctrl = SimpleGem5Mem()
     mem_ctrl.range = system.mem_ranges[0]
     mem_ctrl.tck = 1 / 1.6
     mem_ctrl.port = system.membus.mem_side_ports
     system.mem_ctrl = mem_ctrl
-elif args.mem=="cxlsim":
+elif args.mem == "cxlsim":
     mem_ctrl = CXLSimGem5()
     mem_ctrl.range = system.mem_ranges[0]
     mem_ctrl.tck = 1 / 1.6
     mem_ctrl.port = system.membus.mem_side_ports
     mem_ctrl.config_path = "/data1/sumanthu/gem5/ext/cxlsim/cxlsim/ramulator/configs/DDR4-config.cfg"
-    mem_ctrl.skip_cycle = True
+    mem_ctrl.skip_cycle = False
     system.mem_ctrl = mem_ctrl
-elif args.mem=="ramulator2":
+elif args.mem == "ramulator2":
     mem_ctrl = Ramulator2()
-    mem_ctrl.config_path = './ext/ramulator2/ramulator2/example_config.yaml'
+    mem_ctrl.config_path = "/data1/sumanthu/gem5/ext/ramulator2/ramulator2/example_config.yaml"
     mem_ctrl.range = system.mem_ranges[0]
     mem_ctrl.port = system.membus.mem_side_ports
     system.mem_ctrl = mem_ctrl
