@@ -10,7 +10,7 @@ CXLSimGem5::CXLSimGem5(const Params &p)
     : AbstractMemory(p), port(name() + ".port", *this), retryReq(false), retryResp(false), startTick(0),
       nbrOutstandingReads(0), nbrOutstandingWrites(0), sendResponseEvent([this] { sendResponse(); }, name()),
       tickEvent([this] { tick(); }, name()), req_id(0), config_path(p.config_path), inactive_cycle_count(0),
-      total_cycle_count(0), skip_cycle(p.skip_cycle), ramulatorEvent([this] {ramtick();}, "ramTick") {
+      total_cycle_count(0), skip_cycle(p.skip_cycle), ramulatorEvent([this] { ramtick(); }, "ramTick") {
     DPRINTF(CXLSimGem5, "Instantiated CXLSimGem5 \n");
     // Set the ticks_per_ns parameter in the simulator
     smem.set_ticks_per_ns(sim_clock::as_float::ns);
@@ -118,8 +118,8 @@ unsigned int CXLSimGem5::nbrOutstanding() const {
     // return nbrOutstandingReads + nbrOutstandingWrites + responseQueue.size();
 }
 
-void CXLSimGem5::ramtick(){
-    
+void CXLSimGem5::ramtick() {
+
     // Set current tick
     CXL::curr_tick = curTick();
 
@@ -140,10 +140,9 @@ void CXLSimGem5::ramtick(){
     gem5::Tick next_tick = smem.find_next_tick(curTick());
     // If there are no active transactions, schedule a ramtick
     // Else schedule a full tick
-    if(skip_cycle && smem.sys->hosts[0].no_active_transaction()){
+    if (skip_cycle && smem.sys->hosts[0].no_active_transaction()) {
         schedule(ramulatorEvent, next_tick);
-    }
-    else{
+    } else {
         schedule(tickEvent, next_tick);
     }
     // std::cout<<"Scheduling next tick for "<<next_tick<<std::endl;
@@ -181,10 +180,9 @@ void CXLSimGem5::tick() {
     gem5::Tick next_tick = smem.find_next_tick(curTick());
     // If there are no active transactions, schedule a ramtick
     // Else schedule a full tick
-    if(skip_cycle && smem.sys->hosts[0].no_active_transaction()){
+    if (skip_cycle && smem.sys->hosts[0].no_active_transaction()) {
         schedule(ramulatorEvent, next_tick);
-    }
-    else{
+    } else {
         schedule(tickEvent, next_tick);
     }
 
@@ -256,6 +254,16 @@ bool CXLSimGem5::recvTimingReq(PacketPtr pkt) {
         if (enqueue_success) {
             pending_requests.emplace(req_id, pkt);
             req_id++;
+            // Add to region counts
+            auto regions_accessed =
+                find_special_addr_region(pkt->req->hasVaddr() ? pkt->req->getVaddr() : (uint64_t)0, region_id);
+            for (auto r : regions_accessed) {
+                if (region_counts.find(r) != region_counts.begin()) {
+                    region_counts[r]++;
+                } else {
+                    region_counts[r] = 1;
+                }
+            }
         } else {
             retryReq = true;
         }
