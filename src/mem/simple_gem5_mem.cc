@@ -9,8 +9,14 @@ namespace memory {
 SimpleGem5Mem::SimpleGem5Mem(const Params &p)
     : AbstractMemory(p), port(name() + ".port", *this), retryReq(false), retryResp(false), startTick(0),
       nbrOutstandingReads(0), nbrOutstandingWrites(0), sendResponseEvent([this] { sendResponse(); }, name()),
-      tickEvent([this] { tick(); }, name()), req_id(0) {
+      tickEvent([this] { tick(); }, name()), req_id(0), record(p.record) {
     DPRINTF(SimpleGem5Mem, "Instantiated SimpleGem5Mem \n");
+
+    if (record)
+    {
+        std::ofstream f("mem_ctrl_simplemem.trace");
+        f.close();
+    }
 
     // Set the ticks_per_ns parameter in the simulator
     smem.set_ticks_per_ns(sim_clock::as_float::ns);
@@ -280,6 +286,12 @@ bool SimpleGem5Mem::recvTimingReq(PacketPtr pkt) {
     }
     if (enqueue_success) {
         DPRINTF(SimpleGem5Mem, "Successfully added req %#x to memory\n", pkt->getAddr());
+        if (record)
+        {
+            std::ofstream f("mem_ctrl_simplemem.trace",std::ios::app);
+            f <<req_id<<" 0x" << std::hex<<pkt->getAddr() <<std::endl;
+            f.close();
+        }
         req_id++;
     }
     return enqueue_success;
@@ -411,4 +423,4 @@ SimpleGem5Mem::MemorySystemPort::MemorySystemPort(const std::string &_name, Simp
 } // namespace memory
 } // namespace gem5
 
-#pragma pop_macro("warn")
+// #pragma pop_macro("warn")

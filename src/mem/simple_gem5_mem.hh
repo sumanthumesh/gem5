@@ -125,6 +125,9 @@ class SimpleGem5Mem : public AbstractMemory {
     //Number of accesses to said regions
     std::map<size_t,size_t> region_counts;
 
+    // Configurable parameter which can ask the memory controller to record all reads and writes
+    bool record = false;
+
   public:
     PARAMS(SimpleGem5Mem);
     // typedef SimpleGem5MemParams Params;

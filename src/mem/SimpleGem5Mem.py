@@ -13,6 +13,7 @@ class SimpleGem5Mem(AbstractMemory):
         "The port for receiving memory requests and sending responses"
     )
     tck = Param.Float("DRAM clock period in ns")
+    record = Param.Bool("Set to true if you want to record traces")
 
 
 #   system = Param.System(Parent.any, "System this memory is part of")
