@@ -39,6 +39,17 @@ parser.add_argument(
     help="Memory type: ramulator2, simplemem, atomicmem, cxlsim",
     default="atomicmem",
 )
+parser.add_argument(
+    "--record",
+    help="Set to true if mem accesses need to be recorded",
+    action="store_true",
+    default=False
+)
+parser.add_argument(
+    "--cpu",
+    help="CPU type: timing, O3, atomic",
+    default="O3",
+)
 
 
 args = parser.parse_args()
@@ -76,7 +87,12 @@ system.membus = SystemXBar()
 if args.checkpoint_dir:
     system.cpus = [AtomicSimpleCPU(cpu_id=i) for i in range(NUM_CORES)]
 else:
-    system.cpus = [DerivO3CPU(cpu_id=i) for i in range(NUM_CORES)]
+    if args.cpu == "timing":
+        system.cpus = [TimingSimpleCPU(cpu_id=i) for i in range(NUM_CORES)]
+    elif args.cpu == "O3":
+        system.cpus = [DerivO3CPU(cpu_id=i) for i in range(NUM_CORES)]
+    elif args.cpu == "atomic":
+        system.cpus = [AtomicSimpleCPU(cpu_id=i) for i in range(NUM_CORES)]
 # system.cpus = [TimingSimpleCPU(cpu_id=i) for i in range(NUM_CORES)]
 
 if not args.no_cache:
@@ -140,20 +156,23 @@ elif args.mem == "simplemem":
     mem_ctrl.range = system.mem_ranges[0]
     mem_ctrl.tck = 1 / 1.6
     mem_ctrl.port = system.membus.mem_side_ports
+    mem_ctrl.record = args.record
     system.mem_ctrl = mem_ctrl
 elif args.mem == "cxlsim":
     mem_ctrl = CXLSimGem5()
     mem_ctrl.range = system.mem_ranges[0]
     mem_ctrl.tck = 1 / 1.6
     mem_ctrl.port = system.membus.mem_side_ports
-    mem_ctrl.config_path = "/data1/sumanthu/gem5/ext/cxlsim/cxlsim/ramulator/configs/DDR4-config.cfg"
+    mem_ctrl.config_path = "/data2/sumanthu/gem5/ext/cxlsim/cxlsim/ramulator/configs/DDR4-config.cfg"
     mem_ctrl.skip_cycle = False
+    mem_ctrl.record = args.record
     system.mem_ctrl = mem_ctrl
 elif args.mem == "ramulator2":
     mem_ctrl = Ramulator2()
-    mem_ctrl.config_path = "/data1/sumanthu/gem5/ext/ramulator2/ramulator2/example_config.yaml"
+    mem_ctrl.config_path = "/data2/sumanthu/gem5/ext/ramulator2/ramulator2/example_config.yaml"
     mem_ctrl.range = system.mem_ranges[0]
     mem_ctrl.port = system.membus.mem_side_ports
+    mem_ctrl.record = args.record
     system.mem_ctrl = mem_ctrl
 else:
     print(f"Unknown memory {args.mem}")
