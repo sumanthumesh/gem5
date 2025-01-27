@@ -117,6 +117,12 @@ class Ramulator2 : public AbstractMemory
     uint64_t num_reads = 0;
     uint64_t num_writes = 0;
 
+    // Configurable parameter which can ask the memory controller to record all reads and writes
+    bool record = false;
+
+    // Req id
+    uint64_t req_id;
+
   public:
 
     typedef Ramulator2Params Params;

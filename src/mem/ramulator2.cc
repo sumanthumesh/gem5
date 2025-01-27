@@ -29,9 +29,15 @@ Ramulator2::Ramulator2(const Params &p) :
     retryReq(false), retryResp(false), startTick(0),
     nbrOutstandingReads(0), nbrOutstandingWrites(0),
     sendResponseEvent([this]{ sendResponse(); }, name()),
-    tickEvent([this]{ tick(); }, name())
+    tickEvent([this]{ tick(); }, name()), record(p.record), req_id(0)
 {
     DPRINTF(Ramulator2, "Instantiated Ramulator2 \n");
+
+    if (record)
+    {
+        std::ofstream f("mem_ctrl_ramulator.trace");
+        f.close();
+    }
 
     registerExitCallback([this]() { 
         std::cout<<"NUM READS: "<<num_reads<<"\n";
@@ -244,6 +250,15 @@ Ramulator2::recvTimingReq(PacketPtr pkt)
         // keep it simple and just respond if necessary
         accessAndRespond(pkt);
         return true;
+    }
+
+    if (enqueue_success)
+    {
+        if (record) 
+        {std::ofstream f("mem_ctrl_ramulator.trace",std::ios::app);
+        f <<req_id<<" "<<curTick()<<" 0x" << std::hex<<pkt->getAddr()<<" "<<(pkt->isRead()?"R":"W")<<std::endl;
+        f.close();}
+        req_id++;
     }
 
     return enqueue_success;
