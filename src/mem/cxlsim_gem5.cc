@@ -10,20 +10,27 @@ CXLSimGem5::CXLSimGem5(const Params &p)
     : AbstractMemory(p), port(name() + ".port", *this), retryReq(false), retryResp(false), startTick(0),
       nbrOutstandingReads(0), nbrOutstandingWrites(0), sendResponseEvent([this] { sendResponse(); }, name()),
       tickEvent([this] { tick(); }, name()), req_id(0), config_path(p.config_path), inactive_cycle_count(0),
-      total_cycle_count(0), skip_cycle(p.skip_cycle), ramulatorEvent([this] { ramtick(); }, "ramTick") {
+      total_cycle_count(0), skip_cycle(p.skip_cycle), ramulatorEvent([this] { ramtick(); }, "ramTick"), record(p.record) {
     DPRINTF(CXLSimGem5, "Instantiated CXLSimGem5 \n");
+    
+    std::ofstream f("mem_ctrl_cxlsim.trace");
+    f.close();
+    
+    //set ramulator config file
+    CXL::ramulator_config = p.config_path;
+    smem = std::make_unique<CXL::CXLWrapper>();
     // Set the ticks_per_ns parameter in the simulator
-    smem.set_ticks_per_ns(sim_clock::as_float::ns);
-    smem.set_tclk(p.tck);
+    smem->set_ticks_per_ns(sim_clock::as_float::ns);
+    smem->set_tclk(p.tck);
     // Refresh the parameters
     CXL::params.recalculate();
     CXL::params.print();
     // Add the clocks
-    smem.add_clk(CXL::params.ticks_per_ns);
-    smem.add_clk(CXL::params.delay_ramulator_update);
+    smem->add_clk(CXL::params.ticks_per_ns);
+    smem->add_clk(CXL::params.delay_ramulator_update);
     // Register exit callback
     registerExitCallback([this]() {
-        smem.finalize();
+        smem->finalize();
         for (auto &v : this->region_counts) {
             std::cout << std::dec << "Region" << v.first << ":" << v.second << "\n";
         }
@@ -32,7 +39,7 @@ CXLSimGem5::CXLSimGem5(const Params &p)
     });
 
     // Set the callback function
-    smem.set_callback([this](uint64_t req_id) {
+    smem->set_callback([this](uint64_t req_id) {
         // Check if pending reads has the addr
         panic_if(pending_requests.count(req_id) != 1, "Req %d present %d times instead of 1\n", req_id,
                  pending_requests.count(req_id));
@@ -126,7 +133,7 @@ void CXLSimGem5::ramtick() {
     // Only tick when it's timing mode
     if (system()->isTimingMode()) {
         // DRAM Update
-        smem.sys->hosts[0].update_DRAM();
+        smem->sys->hosts[0].update_DRAM();
         // is the connected port waiting for a retry, if so check the
         // state and send a retry if conditions have changed
         if (retryReq) {
@@ -137,10 +144,10 @@ void CXLSimGem5::ramtick() {
     }
 
     // Schedule event at next tick
-    gem5::Tick next_tick = smem.find_next_tick(curTick());
+    gem5::Tick next_tick = smem->find_next_tick(curTick());
     // If there are no active transactions, schedule a ramtick
     // Else schedule a full tick
-    if (skip_cycle && smem.sys->hosts[0].no_active_transaction()) {
+    if (skip_cycle && smem->sys->hosts[0].no_active_transaction()) {
         schedule(ramulatorEvent, next_tick);
     } else {
         schedule(tickEvent, next_tick);
@@ -161,10 +168,10 @@ void CXLSimGem5::tick() {
     // Only tick when it's timing mode
     if (system()->isTimingMode()) {
         // ramulator2_memorysystem->tick();
-        smem.sys->update();
-        smem.sys->hosts[0].update_DRAM();
+        smem->sys->update();
+        // smem->sys->hosts[0].update_DRAM();
         // Check if this cycle is wasteful
-        if (smem.sys->hosts[0].no_active_transaction())
+        if (smem->sys->hosts[0].no_active_transaction())
             inactive_cycle_count++;
         total_cycle_count++;
         // is the connected port waiting for a retry, if so check the
@@ -177,14 +184,15 @@ void CXLSimGem5::tick() {
     }
 
     // Schedule event at next tick
-    gem5::Tick next_tick = smem.find_next_tick(curTick());
+    // gem5::Tick next_tick = smem->find_next_tick(curTick());
     // If there are no active transactions, schedule a ramtick
     // Else schedule a full tick
-    if (skip_cycle && smem.sys->hosts[0].no_active_transaction()) {
-        schedule(ramulatorEvent, next_tick);
-    } else {
-        schedule(tickEvent, next_tick);
-    }
+    // if (skip_cycle && smem->sys->hosts[0].no_active_transaction()) {
+    //     schedule(ramulatorEvent, next_tick);
+    // } else {
+    // schedule(tickEvent, next_tick);
+    schedule(tickEvent, curTick() + 125);
+    // }
 
     if (nbrOutstanding() == 0)
         signalDrainDone();
@@ -247,12 +255,18 @@ bool CXLSimGem5::recvTimingReq(PacketPtr pkt) {
         // Assign opcode based on whether it is a read or write
         CXL::opcode op = pkt->isRead() ? CXL::opcode::Req : CXL::opcode::RwD;
         // Add the request
-        enqueue_success = smem.add_external_req(pkt->getAddr(), op, req_id);
+        enqueue_success = smem->add_external_req(pkt->getAddr(), op, req_id);
 
         // If enqueue is a success, add the request to pending requests
         // Increment req_id
         if (enqueue_success) {
             pending_requests.emplace(req_id, pkt);
+            if (record)
+            {
+                std::ofstream f("mem_ctrl_cxlsim.trace",std::ios::app);
+                f <<req_id<<" 0x" << std::hex<<pkt->getAddr() <<std::endl;
+                f.close();
+            }
             req_id++;
             // Add to region counts
             auto regions_accessed =
@@ -279,7 +293,7 @@ bool CXLSimGem5::recvTimingReq(PacketPtr pkt) {
     //     //     std::cout << "Load P0x" << std::hex << req.addr << ", V0x" << pkt->req->getVaddr() << "," << region_id
     //     //               << std::endl;
     //     // }
-    //     enqueue_success = smem.add_req_external(req, curTick(), [this](simple_mem::Req &req) {
+    //     enqueue_success = smem->add_req_external(req, curTick(), [this](simple_mem::Req &req) {
     //         DPRINTF(CXLSimGem5, "Read to %ld,%#lx,%s completed.\n", req.id, req.addr,
     //                 (req.op == simple_mem::OpType::READ ? "R" : "W"));
     //         panic_if(pending_reads.find(req.id) == pending_reads.end(),
@@ -330,7 +344,7 @@ bool CXLSimGem5::recvTimingReq(PacketPtr pkt) {
     //     region_id
     //     //               << std::endl;
     //     // }
-    //     enqueue_success = smem.add_req_external(req, curTick(), [this](simple_mem::Req &req) {
+    //     enqueue_success = smem->add_req_external(req, curTick(), [this](simple_mem::Req &req) {
     //         DPRINTF(CXLSimGem5, "Write to %ld,%#lx,%s completed.\n", req.id, req.addr,
     //                 (req.op == simple_mem::OpType::READ ? "R" : "W"));
     //         panic_if(pending_writes.find(req.id) == pending_writes.end(),
@@ -503,5 +517,3 @@ CXLSimGem5::MemorySystemPort::MemorySystemPort(const std::string &_name, CXLSimG
 
 } // namespace memory
 } // namespace gem5
-
-#pragma pop_macro("warn")

@@ -48,7 +48,7 @@ class CXLSimGem5 : public AbstractMemory {
     MemorySystemPort port;
 
     std::string config_path;
-    CXL::CXLWrapper smem;
+    std::unique_ptr<CXL::CXLWrapper> smem;
 
     // std::function<void(Ramulator::Request&)> read_callback;
     // std::function<void(Ramulator::Request&)> write_callback;
@@ -133,6 +133,9 @@ class CXLSimGem5 : public AbstractMemory {
     uint64_t total_cycle_count;
     // Flag that tells us if we should be skipping cycles or not
     bool skip_cycle;
+
+    // Configurable parameter which can ask the memory controller to record all reads and writes
+    bool record = false;
 
   public:
     PARAMS(CXLSimGem5);
