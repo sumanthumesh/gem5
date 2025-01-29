@@ -108,6 +108,19 @@ class CXLSimGem5 : public AbstractMemory
      */
     std::unique_ptr<Packet> pendingDelete;
 
+    /**
+     * Bool telling us whether to record data from reads or writes
+     * Also the filename where to write these values
+     */
+    bool record;
+    std::string record_file;
+    std::ofstream record_file_ptr;
+
+    /**
+     * Counters to count number of reads and writes
+     */
+    uint64_t num_reads, num_writes;
+
   public:
 
     typedef CXLSimGem5Params Params;
