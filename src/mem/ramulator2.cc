@@ -254,10 +254,12 @@ Ramulator2::recvTimingReq(PacketPtr pkt)
 
     if (enqueue_success)
     {
-        if (record) 
-        {std::ofstream f("mem_ctrl_ramulator.trace",std::ios::app);
-        f <<req_id<<" "<<curTick()<<" 0x" << std::hex<<pkt->getAddr()<<" "<<(pkt->isRead()?"R":"W")<<std::endl;
-        f.close();}
+        if (record)
+        {
+            std::ofstream f("mem_ctrl_ramulator.trace",std::ios::app);
+            f <<req_id<<" 0x" << std::hex<<pkt->getAddr() <<std::endl;
+            f.close();
+        }
         req_id++;
     }
 
