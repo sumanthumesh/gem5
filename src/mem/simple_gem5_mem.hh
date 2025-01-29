@@ -1,73 +1,73 @@
 #ifndef __MEM_SIMPLEGEM5MEM_HH__
 #define __MEM_SIMPLEGEM5MEM_HH__
 
-#include <deque>
 #include <functional>
+#include <deque>
 #include <unordered_map>
 
 #include "mem/abstract_mem.hh"
 #include "params/SimpleGem5Mem.hh"
 #include "simple_mem/simple_mem.hh"
 
-// Forward declare SimpleMem
-// namespace simple_mem {
 
-// class SimpleMem;
-// class Req;
-// class OpType;
 
-// }
+namespace gem5
+{
 
-namespace gem5 {
+namespace memory
+{
 
-namespace memory {
 
-class SimpleGem5Mem : public AbstractMemory {
+class SimpleGem5Mem : public AbstractMemory
+{
   private:
-    class MemorySystemPort : public ResponsePort {
+    class MemorySystemPort : public ResponsePort
+    {
 
       private:
-        SimpleGem5Mem &mem;
+        SimpleGem5Mem& smem;
 
       public:
-        MemorySystemPort(const std::string &_name, SimpleGem5Mem &mem);
+        MemorySystemPort(const std::string& _name, SimpleGem5Mem& _mem);
 
       protected:
-        Tick recvAtomic(PacketPtr pkt) override { return mem.recvAtomic(pkt); };
-        void recvFunctional(PacketPtr pkt) override {
-            mem.recvFunctional(pkt);
-        };
-        bool recvTimingReq(PacketPtr pkt) override {
-            return mem.recvTimingReq(pkt);
-        };
-        void recvRespRetry() override { mem.recvRespRetry(); };
+        Tick recvAtomic(PacketPtr pkt) override { return smem.recvAtomic(pkt); };
+        void recvFunctional(PacketPtr pkt) override { smem.recvFunctional(pkt); };
+        bool recvTimingReq(PacketPtr pkt) override { return smem.recvTimingReq(pkt); };
+        void recvRespRetry() override { smem.recvRespRetry(); };
 
-        AddrRangeList getAddrRanges() const override {
-            AddrRangeList ranges;
-            ranges.push_back(mem.getAddrRange());
-            return ranges;
+        AddrRangeList getAddrRanges() const override
+        {
+          AddrRangeList ranges;
+          // ranges.push_back(ramulator2.getAddrRange());
+          ranges.push_back(smem.getAddrRange());
+          return ranges;
         };
     };
 
     MemorySystemPort port;
 
-    std::string config_path;
-    simple_mem::SimpleMem smem;
+    // std::string config_path;
+    // Ramulator::IFrontEnd* ramulator2_frontend;
+    // Ramulator::IMemorySystem* ramulator2_memorysystem;
 
     // std::function<void(Ramulator::Request&)> read_callback;
     // std::function<void(Ramulator::Request&)> write_callback;
+
+    /**
+     * Actual memory model
+     */
+    std::unique_ptr<simple_mem::SimpleMem> mem_model;
+
     bool retryReq;
     bool retryResp;
     Tick startTick;
     std::unordered_map<Addr, std::deque<PacketPtr>> outstandingReads;
     std::unordered_map<Addr, std::deque<PacketPtr>> outstandingWrites;
-    //Simple maps to hold outstanding requests as a req_id:pktptr pair
-    std::unordered_map<uint64_t,PacketPtr> pending_reads;
-    std::unordered_map<uint64_t,PacketPtr> pending_writes;
 
     /**
      * Count the number of outstanding transactions so that we can
-     * block any further requests until there is space in Ramulator2 and
+     * block any further requests until there is space in SimpleGem5Mem and
      * the sending queue we need to buffer the response packets.
      */
     unsigned int nbrOutstandingReads;
@@ -75,10 +75,11 @@ class SimpleGem5Mem : public AbstractMemory {
 
     /**
      * Queue to hold response packets until we can send them
-     * back. This is needed as Ramulator2 unconditionally passes
+     * back. This is needed as SimpleGem5Mem unconditionally passes
      * responses back without any flow control.
      */
     std::deque<PacketPtr> responseQueue;
+
 
     unsigned int nbrOutstanding() const;
 
@@ -114,28 +115,19 @@ class SimpleGem5Mem : public AbstractMemory {
      */
     std::unique_ptr<Packet> pendingDelete;
 
-	//To hold request ID
-	uint64_t req_id;
-
     /**
-     * List of special address regions
+     * Unique ID to keep track of requests
      */
-    std::map<uint64_t,std::pair<uint64_t, size_t>> *addr_regions;
-
-    //Number of accesses to said regions
-    std::map<size_t,size_t> region_counts;
-
-    // Configurable parameter which can ask the memory controller to record all reads and writes
-    bool record = false;
+    uint64_t req_id = 0;
 
   public:
-    PARAMS(SimpleGem5Mem);
-    // typedef SimpleGem5MemParams Params;
+
+    typedef SimpleGem5MemParams Params;
     SimpleGem5Mem(const Params &p);
 
     DrainState drain() override;
 
-    virtual Port &getPort(const std::string &if_name,
+    virtual Port& getPort(const std::string& if_name,
                           PortID idx = InvalidPortID) override;
 
     void init() override;
@@ -144,15 +136,15 @@ class SimpleGem5Mem : public AbstractMemory {
     void resetStats() override;
 
   protected:
+
     Tick recvAtomic(PacketPtr pkt);
     void recvFunctional(PacketPtr pkt);
     bool recvTimingReq(PacketPtr pkt);
     void recvRespRetry();
 
-    std::vector<size_t> find_special_addr_region(uint64_t addr, size_t size);
 };
 
 } // namespace memory
 } // namespace gem5
 
-#endif // __MEM_RAMULATOR2_HH__
+#endif // __MEM_SIMPLEGEM5MEM_HH__
