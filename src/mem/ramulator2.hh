@@ -117,8 +117,13 @@ class Ramulator2 : public AbstractMemory
     uint64_t num_reads = 0;
     uint64_t num_writes = 0;
 
-    // Configurable parameter which can ask the memory controller to record all reads and writes
-    bool record = false;
+    /**
+     * Bool telling us whether to record data from reads or writes
+     * Also the filename where to write these values
+     */
+    bool record;
+    std::string record_file;
+    std::ofstream record_file_ptr;
 
     // Req id
     uint64_t req_id;

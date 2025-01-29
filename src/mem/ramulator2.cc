@@ -29,21 +29,20 @@ Ramulator2::Ramulator2(const Params &p) :
     retryReq(false), retryResp(false), startTick(0),
     nbrOutstandingReads(0), nbrOutstandingWrites(0),
     sendResponseEvent([this]{ sendResponse(); }, name()),
-    tickEvent([this]{ tick(); }, name()), record(p.record), req_id(0)
+    tickEvent([this]{ tick(); }, name()), record(p.record), req_id(0), record_file("record_ramulator2.dat")
 {
     DPRINTF(Ramulator2, "Instantiated Ramulator2 \n");
 
+    // Record data written to and read from memory
     if (record)
-    {
-        std::ofstream f("mem_ctrl_ramulator.trace");
-        f.close();
-    }
+        record_file_ptr.open(record_file);
 
     registerExitCallback([this]() { 
-        std::cout<<"NUM READS: "<<num_reads<<"\n";
+        std::cout<<"NUM READS : "<<num_reads<<"\n";
         std::cout<<"NUM WRITES: "<<num_writes<<"\n";
         ramulator2_frontend->finalize();
         ramulator2_memorysystem->finalize();
+        panic_if(nbrOutstanding()!=0, "All requests haven't been fulfilled\n");
     });
 }
 
@@ -254,12 +253,6 @@ Ramulator2::recvTimingReq(PacketPtr pkt)
 
     if (enqueue_success)
     {
-        if (record)
-        {
-            std::ofstream f("mem_ctrl_ramulator.trace",std::ios::app);
-            f <<req_id<<" 0x" << std::hex<<pkt->getAddr() <<std::endl;
-            f.close();
-        }
         req_id++;
     }
 
@@ -284,6 +277,11 @@ Ramulator2::accessAndRespond(PacketPtr pkt)
     bool needsResponse = pkt->needsResponse();
 
     access(pkt);
+
+    if(record)
+    {
+        record_file_ptr<<pkt->getAddr()<<","<<pkt->sprintData()<<"\n";
+    }
 
     // turn packet around to go back to requestor if response expected
     if (needsResponse) {
