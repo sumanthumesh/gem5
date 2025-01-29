@@ -22,7 +22,7 @@ SimpleGem5Mem::SimpleGem5Mem(const Params &p) :
     retryReq(false), retryResp(false), startTick(0),
     nbrOutstandingReads(0), nbrOutstandingWrites(0),
     sendResponseEvent([this]{ sendResponse(); }, name()),
-    tickEvent([this]{ tick(); }, name()), req_id(0)
+    tickEvent([this]{ tick(); }, name()), req_id(0),record(p.record), num_reads(0), num_writes(0), record_file("record_simplemem.dat")
 {
     DPRINTF(SimpleGem5Mem, "Instantiated SimpleGem5Mem \n");
 
@@ -32,10 +32,19 @@ SimpleGem5Mem::SimpleGem5Mem(const Params &p) :
     mem_model = std::make_unique<simple_mem::SimpleMem>();
     mem_model->set_ticks_per_ns(sim_clock::as_float::ns);
 
+    // Record data written to and read from memory
+    if (record)
+        record_file_ptr.open(record_file);
+
     registerExitCallback([this]() { 
         std::cout<<"Finished SimpleGem5Mem simulation\n";
         mem_model->finalize();
-        std::cout<<"Outstanding reqs "<<nbrOutstanding()<<"\n";
+        std::cout<<"NUM READS : "<<num_reads<<"\n";
+        std::cout<<"NUM WRITES: "<<num_writes<<"\n";
+        // Close the record file
+        if (record)
+            record_file_ptr.close();
+        panic_if(nbrOutstanding()!=0, "All requests haven't been fulfilled\n");
     });
 }
 
@@ -274,6 +283,10 @@ SimpleGem5Mem::accessAndRespond(PacketPtr pkt)
     bool needsResponse = pkt->needsResponse();
 
     access(pkt);
+    if(record)
+    {
+        record_file_ptr<<pkt->getAddr()<<","<<pkt->sprintData()<<"\n";
+    }
 
     // turn packet around to go back to requestor if response expected
     if (needsResponse) {

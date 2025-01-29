@@ -120,6 +120,19 @@ class SimpleGem5Mem : public AbstractMemory
      */
     uint64_t req_id = 0;
 
+    /**
+     * Bool telling us whether to record data from reads or writes
+     * Also the filename where to write these values
+     */
+    bool record;
+    std::string record_file;
+    std::ofstream record_file_ptr;
+
+    /**
+     * Counters to count number of reads and writes
+     */
+    uint64_t num_reads, num_writes;
+
   public:
 
     typedef SimpleGem5MemParams Params;
