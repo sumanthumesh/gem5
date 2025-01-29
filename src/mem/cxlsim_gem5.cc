@@ -184,14 +184,14 @@ void CXLSimGem5::tick() {
     }
 
     // Schedule event at next tick
-    // gem5::Tick next_tick = smem->find_next_tick(curTick());
+    gem5::Tick next_tick = smem->find_next_tick(curTick());
     // If there are no active transactions, schedule a ramtick
     // Else schedule a full tick
     // if (skip_cycle && smem->sys->hosts[0].no_active_transaction()) {
     //     schedule(ramulatorEvent, next_tick);
     // } else {
-    // schedule(tickEvent, next_tick);
-    schedule(tickEvent, curTick() + 125);
+    schedule(tickEvent, next_tick);
+    // schedule(tickEvent, curTick() + 125);
     // }
 
     if (nbrOutstanding() == 0)
