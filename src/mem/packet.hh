@@ -51,6 +51,7 @@
 #include <cassert>
 #include <initializer_list>
 #include <list>
+#include <iomanip>
 
 #include "base/addr_range.hh"
 #include "base/cast.hh"
@@ -1334,6 +1335,22 @@ class Packet : public Printable, public Extensible<Packet>
                 // Disabled bytes stay untouched
             }
         }
+    }
+
+    /**
+     * Write the data that is stored in the packet into a string that can be printed
+     */
+    std::string sprintData() const {
+
+        std::stringstream ss;
+
+        for (size_t i = 0; i < size; ++i) {
+            // Output each byte in hexadecimal, ensuring two digits with leading zero if needed
+            ss << std::hex << std::setw(2) << std::setfill('0') << (int)(getConstPtr<uint8_t>()[i]);
+        }
+
+        return ss.str();
+
     }
 
     /**
