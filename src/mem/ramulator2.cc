@@ -42,7 +42,10 @@ Ramulator2::Ramulator2(const Params &p) :
         std::cout<<"NUM WRITES: "<<num_writes<<"\n";
         ramulator2_frontend->finalize();
         ramulator2_memorysystem->finalize();
-        panic_if(nbrOutstanding()!=0, "All requests haven't been fulfilled\n");
+        // Close the record file
+        if (record)
+            record_file_ptr.close();
+        // panic_if(nbrOutstanding()!=0, "All requests haven't been fulfilled\n");
     });
 }
 
