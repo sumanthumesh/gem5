@@ -121,6 +121,11 @@ class CXLSimGem5 : public AbstractMemory
      */
     uint64_t num_reads, num_writes;
 
+    /**
+     * Custom req id counter
+     */
+    uint64_t req_id;
+
   public:
 
     typedef CXLSimGem5Params Params;
