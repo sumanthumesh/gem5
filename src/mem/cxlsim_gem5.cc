@@ -23,7 +23,7 @@ CXLSimGem5::CXLSimGem5(const Params &p) :
     retryReq(false), retryResp(false), startTick(0),
     nbrOutstandingReads(0), nbrOutstandingWrites(0),
     sendResponseEvent([this]{ sendResponse(); }, name()),
-    tickEvent([this]{ tick(); }, name()), record(p.record), num_reads(0), num_writes(0), record_file("record_cxlsim.dat")
+    tickEvent([this]{ tick(); }, name()), record(p.record), num_reads(0), num_writes(0), req_id(0), record_file("record_cxlsim.dat")
 {
     DPRINTF(CXLSimGem5, "Instantiated CXLSimGem5 \n");
 
@@ -184,7 +184,7 @@ CXLSimGem5::recvTimingReq(PacketPtr pkt)
     if (retryReq)
         return false;
 
-    uint64_t addr = pkt->getAddr(), id = pkt->id;
+    uint64_t addr = pkt->getAddr(), id = req_id;
     CXL::opcode op = pkt->isRead() ? CXL::opcode::Req : CXL::opcode::RwD;
 
 
@@ -220,6 +220,7 @@ CXLSimGem5::recvTimingReq(PacketPtr pkt)
             // back, note that this will differ for reads and writes
             ++nbrOutstandingReads;
             num_reads++;
+            req_id++;
         } 
         else 
         {
@@ -240,7 +241,7 @@ CXLSimGem5::recvTimingReq(PacketPtr pkt)
                 // added counter to track requests in flight
                 --nbrOutstandingWrites;
 
-                // accessAndRespond(pkt);
+                accessAndRespond(pkt);
             });
 
         if (enqueue_success) 
@@ -252,18 +253,24 @@ CXLSimGem5::recvTimingReq(PacketPtr pkt)
             ++nbrOutstandingWrites;
 
             // perform the access for writes
-            accessAndRespond(pkt);
+            // accessAndRespond(pkt);
             
             num_writes++;
+            req_id++;
         } 
         else 
         {
             retryReq = true;
         }
     } else {
+        panic("Shouldnt ever reach here\n");
         // keep it simple and just respond if necessary
         accessAndRespond(pkt);
         return true;
+    }
+    if (enqueue_success && record)
+    {
+        record_file_ptr<<std::hex<<pkt->getAddr()<<"\n";
     }
 
     return enqueue_success;
@@ -287,10 +294,6 @@ CXLSimGem5::accessAndRespond(PacketPtr pkt)
     bool needsResponse = pkt->needsResponse();
 
     access(pkt);
-    if(record)
-    {
-        record_file_ptr<<pkt->getAddr()<<","<<pkt->sprintData()<<"\n";
-    }
 
     // turn packet around to go back to requestor if response expected
     if (needsResponse) {
