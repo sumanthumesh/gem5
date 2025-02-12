@@ -42,6 +42,10 @@ CXLSimGem5::CXLSimGem5(const Params &p) :
     if (record)
         record_file_ptr.open(record_file);
 
+    // Note down the callback order
+    std::ofstream f("callback_order.trace");
+    f.close();
+
     registerExitCallback([this]() {
         std::cout<<"Finished CXL Simulation\n";    
         std::cout<<"NUM READS : "<<num_reads<<"\n";
@@ -93,6 +97,10 @@ CXLSimGem5::sendResponse()
 
     bool success = port.sendTimingResp(responseQueue.front());
     if (success) {
+        // Note down the callback order
+        auto pkt = responseQueue.front();
+        if(record)
+            record_file_ptr<<"R,"<<std::hex<<pkt->getAddr()<<","<<(pkt->isRead()?"R":"W")<<"\n";
         DPRINTF(CXLSimGem5, "Sent response for %lu\n", responseQueue.front()->id);
         responseQueue.pop_front();
 
@@ -105,6 +113,7 @@ CXLSimGem5::sendResponse()
 
         if (nbrOutstanding() == 0)
             signalDrainDone();
+
     } else {
         retryResp = true;
 
@@ -117,7 +126,8 @@ CXLSimGem5::sendResponse()
 unsigned int
 CXLSimGem5::nbrOutstanding() const
 {
-    return nbrOutstandingReads + nbrOutstandingWrites + responseQueue.size();
+    // return nbrOutstandingReads + nbrOutstandingWrites + responseQueue.size();
+    return pendingRequests.size() + responseQueue.size();
 }
 
 void
@@ -168,8 +178,8 @@ CXLSimGem5::recvFunctional(PacketPtr pkt)
 bool
 CXLSimGem5::recvTimingReq(PacketPtr pkt)
 {
-    DPRINTF(CXLSimGem5, "recvTimingReq: request %s addr %#x size %d id %lu\n",
-            pkt->cmdString(), pkt->getAddr(), pkt->getSize(), pkt->id);
+    DPRINTF(CXLSimGem5, "recvTimingReq: request %s addr %#x size %d\n",
+            pkt->cmdString(), pkt->getAddr(), pkt->getSize());
 
     panic_if(pkt->cacheResponding(), "Should not see packets where cache "
              "is responding");
@@ -188,37 +198,47 @@ CXLSimGem5::recvTimingReq(PacketPtr pkt)
     CXL::opcode op = pkt->isRead() ? CXL::opcode::Req : CXL::opcode::RwD;
 
 
-    DPRINTF(CXLSimGem5, "Rcvd req %s,%lu,%#lx\n", pkt->isRead()?"R":"W", pkt->id, addr);
+    DPRINTF(CXLSimGem5, "Rcvd req %s,%lu,%#lx\n", pkt->isRead()?"R":"W", id, addr);
 
 
     bool enqueue_success = false;
     if (pkt->isRead()) 
     {
+        // accessAndRespond(pkt);
         // Generate ramulator READ request and try to send to ramulator's memory system
         enqueue_success = mem_model->add_external_req(addr, op, id, 
-            [this](uint64_t addr) {
-                auto& pkt_q = outstandingReads.find(addr)->second;
-                PacketPtr pkt = pkt_q.front();
-                DPRINTF(CXLSimGem5, "Read to ID: %lu, Addr: %#lx completed.\n", pkt->id, addr);
-                pkt_q.pop_front();
-                if (!pkt_q.size())
-                    outstandingReads.erase(addr);
+            [this, addr](uint64_t rid) {
+                panic_if(pendingRequests.find(rid) == pendingRequests.end(), "Request %lu not found in pendingRequests\n", rid);
+                PacketPtr &pkt = pendingRequests.find(rid)->second;
+                panic_if(addr != pkt->getAddr(), "Captured address %#lx and packet address %#lx do not match\n", addr, pkt->getAddr());
+                DPRINTF(CXLSimGem5, "Callback for ID: %lu, Addr: %#lx\n", rid, pkt->getAddr());
 
                 // added counter to track requests in flight
-                --nbrOutstandingReads;
+                // --nbrOutstandingReads;
 
                 accessAndRespond(pkt);
+
+                // Note down the callback order
+                if(record)
+                    record_file_ptr<<"C,"<<std::hex<<pkt->getAddr()<<","<<(pkt->isRead()?"R":"W")<<"\n";
+
+                // Delete packet from pending requests
+                pendingRequests.erase(rid);
+                panic_if(pendingRequests.find(rid) != pendingRequests.end(), "Pkt found after deletion\n");
+                DPRINTF(CXLSimGem5, "Read for ID: %lu, Addr: %#lx completed\n", rid, pkt->getAddr());
+
             });
 
         if (enqueue_success) 
         {
             DPRINTF(CXLSimGem5, "Added read id %lu to mem_model\n", id);
-            outstandingReads[pkt->getAddr()].push_back(pkt);
-
+            // outstandingReads[pkt->getAddr()].push_back(pkt);
+            panic_if(pendingRequests.find(id) != pendingRequests.end(), "Request already exists in pendingRequests\n");
+            pendingRequests.insert({id,pkt});
             // we count a transaction as outstanding until it has left the
             // queue in the controller, and the response has been sent
             // back, note that this will differ for reads and writes
-            ++nbrOutstandingReads;
+            // ++nbrOutstandingReads;
             num_reads++;
             req_id++;
         } 
@@ -227,34 +247,40 @@ CXLSimGem5::recvTimingReq(PacketPtr pkt)
             retryReq = true;
         }
     } else if (pkt->isWrite()) {
-        // Generate ramulator WRITE request and try to send to ramulator's memory system
-        enqueue_success = mem_model->
-            add_external_req(addr, op, id, 
-            [this](uint64_t addr) {
-                auto& pkt_q = outstandingWrites.find(addr)->second;
-                PacketPtr pkt = pkt_q.front();
-                DPRINTF(CXLSimGem5, "Write to ID: %lu, Addr: %#lx completed.\n", pkt->id, addr);
-                pkt_q.pop_front();
-                if (!pkt_q.size())
-                    outstandingWrites.erase(addr);
+        
+        // accessAndRespond(pkt);
+        // Generate ramulator READ request and try to send to ramulator's memory system
+        enqueue_success = mem_model->add_external_req(addr, op, id, 
+            [this, addr](uint64_t rid) {
+                panic_if(pendingRequests.find(rid) == pendingRequests.end(), "Request %lu not found in pendingRequests\n", rid);
+                PacketPtr &pkt = pendingRequests.find(rid)->second;
+                // panic_if(addr != pkt->getAddr(), "Captured address %#lx and packet address %#lx do not match\n", addr, pkt->getAddr());
+                DPRINTF(CXLSimGem5, "Callback for ID: %lu, Addr: %#lx\n", rid, pkt->getAddr());
 
                 // added counter to track requests in flight
-                --nbrOutstandingWrites;
+                // --nbrOutstandingReads;
 
-                accessAndRespond(pkt);
+
+                // Note down the callback order
+                // record_file_ptr<<"C,"<<std::hex<<pkt->getAddr()<<","<<(pkt->isRead()?"R":"W")<<"\n";              
+
+                // Delete packet from pending requests
+                pendingRequests.erase(rid);
+                panic_if(pendingRequests.find(rid) != pendingRequests.end(), "Pkt found after deletion\n");
+                DPRINTF(CXLSimGem5, "Write for ID: %lu, Addr: %#lx completed\n", rid, pkt->getAddr());
             });
 
         if (enqueue_success) 
         {
             DPRINTF(CXLSimGem5, "Added write id %lu to mem_model\n", id);
-
-            outstandingWrites[pkt->getAddr()].push_back(pkt);
-
-            ++nbrOutstandingWrites;
-
-            // perform the access for writes
-            // accessAndRespond(pkt);
-            
+            // outstandingReads[pkt->getAddr()].push_back(pkt);
+            panic_if(pendingRequests.find(id) != pendingRequests.end(), "Request already exists in pendingRequests\n");
+            pendingRequests.insert({id,pkt});
+            // we count a transaction as outstanding until it has left the
+            // queue in the controller, and the response has been sent
+            // back, note that this will differ for reads and writes
+            // ++nbrOutstandingReads;
+            accessAndRespond(pkt);
             num_writes++;
             req_id++;
         } 
@@ -262,6 +288,43 @@ CXLSimGem5::recvTimingReq(PacketPtr pkt)
         {
             retryReq = true;
         }
+        
+        // accessAndRespond(pkt);
+        // // Generate ramulator WRITE request and try to send to ramulator's memory system
+        // enqueue_success = mem_model->
+        //     add_external_req(addr, op, id, 
+        //     [this](uint64_t addr) {
+        //         auto& pkt_q = outstandingWrites.find(addr)->second;
+        //         PacketPtr pkt = pkt_q.front();
+        //         DPRINTF(CXLSimGem5, "Write to ID: %lu, Addr: %#lx completed.\n", pkt->id, addr);
+        //         pkt_q.pop_front();
+        //         if (!pkt_q.size())
+        //             outstandingWrites.erase(addr);
+
+        //         // added counter to track requests in flight
+        //         --nbrOutstandingWrites;
+
+        //         accessAndRespond(pkt);
+        //     });
+
+        // if (enqueue_success) 
+        // {
+        //     DPRINTF(CXLSimGem5, "Added write id %lu to mem_model\n", id);
+
+        //     outstandingWrites[pkt->getAddr()].push_back(pkt);
+
+        //     ++nbrOutstandingWrites;
+
+        //     // perform the access for writes
+        //     // accessAndRespond(pkt);
+            
+        //     num_writes++;
+        //     req_id++;
+        // } 
+        // else 
+        // {
+        //     retryReq = true;
+        // }
     } else {
         panic("Shouldnt ever reach here\n");
         // keep it simple and just respond if necessary
@@ -270,7 +333,7 @@ CXLSimGem5::recvTimingReq(PacketPtr pkt)
     }
     if (enqueue_success && record)
     {
-        record_file_ptr<<std::hex<<pkt->getAddr()<<"\n";
+        record_file_ptr<<"E,"<<std::hex<<pkt->getAddr()<<","<<(pkt->isRead()?"R":"W")<<"\n";
     }
 
     return enqueue_success;
@@ -289,11 +352,15 @@ CXLSimGem5::recvRespRetry()
 void
 CXLSimGem5::accessAndRespond(PacketPtr pkt)
 {
-    DPRINTF(CXLSimGem5, "Access for req id %lu addr %#lx\n", pkt->id, pkt->getAddr());
+    DPRINTF(CXLSimGem5, "Access for addr %#lx\n", pkt->getAddr());
 
     bool needsResponse = pkt->needsResponse();
 
+
+    Addr before = pkt->getAddr();
     access(pkt);
+    Addr after = pkt->getAddr();
+    panic_if(before != after, "Addr changed before %#lx and after %#lx access\n",before,after);
 
     // turn packet around to go back to requestor if response expected
     if (needsResponse) {
