@@ -50,6 +50,11 @@ parser.add_argument(
     help="CPU type: timing, O3, atomic",
     default="O3",
 )
+parser.add_argument(
+    "--mem-mode",
+    help="Memory mode: timing, atomic",
+    default="timing",
+)
 
 
 args = parser.parse_args()
@@ -77,7 +82,7 @@ system.clk_domain.voltage_domain = VoltageDomain()
 if args.checkpoint_dir:
     system.mem_mode = "atomic"
 else:
-    system.mem_mode = "timing"
+    system.mem_mode = args.mem_mode
 system.mem_ranges = [AddrRange("8GB")]
 
 # Memory bus
