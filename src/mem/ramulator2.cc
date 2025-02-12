@@ -163,8 +163,8 @@ Ramulator2::recvFunctional(PacketPtr pkt)
 bool
 Ramulator2::recvTimingReq(PacketPtr pkt)
 {
-    DPRINTF(Ramulator2, "recvTimingReq: request %s addr %#x size %d\n",
-            pkt->cmdString(), pkt->getAddr(), pkt->getSize());
+    DPRINTF(Ramulator2, "recvTimingReq: request %s addr %#x size %d id %lu\n",
+            pkt->cmdString(), pkt->getAddr(), pkt->getSize(),pkt->id);
 
     panic_if(pkt->cacheResponding(), "Should not see packets where cache "
              "is responding");
@@ -250,11 +250,15 @@ Ramulator2::recvTimingReq(PacketPtr pkt)
         accessAndRespond(pkt);
         return true;
     }
-
+    if (enqueue_success && record)
+    {
+        record_file_ptr<<"E,"<<std::dec<<req_id<<","<<std::hex<<pkt->getAddr()<<","<<(pkt->isRead()?"R":"W")<<"\n";
+    }
     if (enqueue_success)
     {
         req_id++;
     }
+
 
     return enqueue_success;
 }
@@ -278,10 +282,10 @@ Ramulator2::accessAndRespond(PacketPtr pkt)
 
     access(pkt);
 
-    if(record)
-    {
-        record_file_ptr<<pkt->getAddr()<<","<<pkt->sprintData()<<"\n";
-    }
+    // if(record)
+    // {
+    //     record_file_ptr<<pkt->getAddr()<<","<<pkt->sprintData()<<"\n";
+    // }
 
     // turn packet around to go back to requestor if response expected
     if (needsResponse) {
