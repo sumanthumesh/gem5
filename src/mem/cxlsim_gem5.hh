@@ -57,6 +57,7 @@ class CXLSimGem5 : public AbstractMemory
     Tick startTick;
     std::unordered_map<Addr, std::deque<PacketPtr>> outstandingReads;
     std::unordered_map<Addr, std::deque<PacketPtr>> outstandingWrites;
+    std::unordered_map<uint64_t, PacketPtr> pendingRequests;
 
     /**
      * Count the number of outstanding transactions so that we can
