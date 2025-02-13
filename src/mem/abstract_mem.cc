@@ -564,13 +564,13 @@ std::vector<size_t> AbstractMemory::find_accessed_region(Addr addr, unsigned siz
             detected_regions.push_back(it->second.second);
     }
 
-    // Update the region counts
-    for (auto &v: detected_regions){
-        if (region_access_counts.find(v)!=region_access_counts.end())
-            region_access_counts[v]++;
-        else
-            region_access_counts[v] = 1;
-    }
+    // // Update the region counts
+    // for (auto &v: detected_regions){
+    //     if (region_access_counts.find(v)!=region_access_counts.end())
+    //         region_access_counts[v]++;
+    //     else
+    //         region_access_counts[v] = 1;
+    // }
 
     return detected_regions;
 }
