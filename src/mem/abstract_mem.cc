@@ -519,5 +519,61 @@ AbstractMemory::functionalAccess(PacketPtr pkt)
     }
 }
 
+std::vector<size_t> AbstractMemory::find_accessed_region(Addr addr, unsigned size){
+
+    auto is_between = [](Addr addr, Addr start, Addr end){
+        // Return true if addr is in the region [start, end)
+        if (addr >= start && addr < end)
+            return true;
+        return false;
+    };
+
+    auto is_overlap = [&is_between](Addr start1, Addr end1, Addr addr, unsigned size){
+        // Return true if there is any overlap between [start1, end) and [addr, addr + size)
+        Addr start2 = addr, end2 = start2 + size; 
+        // Check if there is any overlap
+        if (is_between(start1, start2, end2) || is_between(end1, start2, end2) || is_between(start2, start1, end1) || is_between(end2, start1, end1))
+            return true;
+        return false;
+    };
+
+    // This is the vector of region_id we will return
+    std::vector<size_t> detected_regions;
+    // Make sure that address region exists
+    panic_if(system()->get_special_addr_regions()==nullptr, "Special address regions not allocated\n");
+    // Find the first start of an address range that is >= the given address
+    auto addr_regions = system()->get_special_addr_regions();
+    auto lb = addr_regions->lower_bound(addr);
+    // If no lower bound found, return empty vector
+    if(lb == addr_regions->end())
+        return detected_regions;
+    // Now, check if there is any overlap with lb
+    auto it = lb;
+    if(is_overlap(it->first, it->second.first, addr, size))
+        detected_regions.push_back(it->second.second);
+    // Now check one region before lb
+    if(lb != addr_regions->begin()){
+        auto it = std::prev(lb);
+        if(is_overlap(it->first, it->second.first, addr, size))
+            detected_regions.push_back(it->second.second);
+    }
+    // Now check one region after lb
+    if(std::next(lb) != addr_regions->end()){
+        auto it = std::next(lb);
+        if(is_overlap(it->first, it->second.first, addr, size))
+            detected_regions.push_back(it->second.second);
+    }
+
+    // Update the region counts
+    for (auto &v: detected_regions){
+        if (region_access_counts.find(v)!=region_access_counts.end())
+            region_access_counts[v]++;
+        else
+            region_access_counts[v] = 1;
+    }
+
+    return detected_regions;
+}
+
 } // namespace memory
 } // namespace gem5
