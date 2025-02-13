@@ -333,6 +333,12 @@ class System : public SimObject, public PCEventScope
 
     std::map<uint64_t, std::pair<uint64_t, size_t>> addr_regions;
 
+    /**
+     * This flag marks region of interest within which we monitor memory accesses
+     * It is set/reset through the m5_memory_region_cmd API from the workload source
+     */
+    bool monitor_special_mem_regions = false;
+
   public:
     /**
      * Get a pointer to the Kernel Virtual Machine (KVM) SimObject,
@@ -386,6 +392,13 @@ class System : public SimObject, public PCEventScope
      * Return a pointer to data structure holding the special address regions indicated by the m5_add_mem_region API
      */
     std::map<uint64_t,std::pair<uint64_t,size_t>> *get_special_addr_regions() {return &addr_regions;}
+    /**
+     * Set the monitor_special_addr_regions flags
+     */
+    void memRegionROIStart() {monitor_special_mem_regions = true;}
+    void memRegionROIEnd() {monitor_special_mem_regions = false;}
+    bool isMemRegionROI() {return monitor_special_mem_regions;}
+
 
     /*
      * Return the list of address ranges backed by a shadowed ROM.

@@ -551,6 +551,7 @@ void m5memregioncmd(ThreadContext *tc, size_t n) {
     case 1: // Load from file
     {
         std::ifstream f(dump_file.string());
+        panic_if(!std::filesystem::exists(dump_file),"Did not find %s to read memory regions form",dump_file.string());
 
         std::string line;
 
@@ -573,6 +574,18 @@ void m5memregioncmd(ThreadContext *tc, size_t n) {
         }
 
         std::cout << "Finished loading " << addr_regions->size() << " from file" << std::endl;
+        break;
+    }
+    case 2: //Start region of interest where we track accesses
+    {
+        tc->getSystemPtr()->memRegionROIStart();
+        std::cout<<"Setting MemRegionROI to "<<(tc->getSystemPtr()->isMemRegionROI()?"True":"False")<<"\n";
+        break;
+    }
+    case 3: //End region of interest where we track accesses
+    {
+        tc->getSystemPtr()->memRegionROIEnd();
+        std::cout<<"Setting MemRegionROI to "<<(tc->getSystemPtr()->isMemRegionROI()?"True":"False")<<"\n";
         break;
     }
     default: {
