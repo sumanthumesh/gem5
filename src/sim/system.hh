@@ -339,6 +339,11 @@ class System : public SimObject, public PCEventScope
      */
     bool monitor_special_mem_regions = false;
 
+    /**
+     * This set holds all region ids which have been read from mapping file
+     */
+    std::unordered_set<size_t> mapped_regions;
+
   public:
     /**
      * Get a pointer to the Kernel Virtual Machine (KVM) SimObject,
@@ -398,6 +403,10 @@ class System : public SimObject, public PCEventScope
     void memRegionROIStart() {monitor_special_mem_regions = true;}
     void memRegionROIEnd() {monitor_special_mem_regions = false;}
     bool isMemRegionROI() {return monitor_special_mem_regions;}
+    /**
+     * Return pointer to set which has the mapped memory regions
+     */
+    std::unordered_set<size_t>* getMappedRegions() {return &mapped_regions;}
 
 
     /*
