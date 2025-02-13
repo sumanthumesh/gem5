@@ -53,6 +53,10 @@ CXLSimGem5::CXLSimGem5(const Params &p) :
         // Close the record file
         if (record)
             record_file_ptr.close();
+        // Print out all accessed special regions
+        for (auto &v: region_access_counts){
+            std::cout<<v.first<<" : "<<v.second<<"\n";
+        }
         panic_if(nbrOutstanding()!=0, "All requests haven't been fulfilled\n");
     });
 }
@@ -331,9 +335,17 @@ CXLSimGem5::recvTimingReq(PacketPtr pkt)
         accessAndRespond(pkt);
         return true;
     }
-    if (enqueue_success && record)
+    if (enqueue_success)
     {
-        record_file_ptr<<"E,"<<std::hex<<pkt->getAddr()<<","<<(pkt->isRead()?"R":"W")<<"\n";
+        // Find out if this access was part of a special memory region and update the per region counters
+        // Remember to give the virtual address here, not physical address
+        // Also ensure it aligns to 64 byte cacheline
+        if (system()->isMemRegionROI())
+        {
+            find_accessed_region(pkt->req->hasVaddr()?((pkt->req->getVaddr()>>6)<<6):0,pkt->req->getSize());
+        }
+        if (record)
+            record_file_ptr<<"E,"<<std::hex<<pkt->getAddr()<<","<<(pkt->isRead()?"R":"W")<<"\n";
     }
 
     return enqueue_success;
