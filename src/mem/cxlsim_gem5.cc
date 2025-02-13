@@ -200,10 +200,22 @@ CXLSimGem5::recvTimingReq(PacketPtr pkt)
 
     uint64_t addr = pkt->getAddr(), id = req_id;
     CXL::opcode op = pkt->isRead() ? CXL::opcode::Req : CXL::opcode::RwD;
-
+    
+    std::vector<size_t> accessed_regions = find_accessed_region(pkt->req->hasVaddr()?((pkt->req->getVaddr()>>6)<<6):0,pkt->req->getSize());
+    bool is_cxl_access = false;
+    auto mapped_regions = system()->getMappedRegions();
+    // See if any accessed region is part of mapped region, if so it should goto CXL
+    for (auto &v: accessed_regions)
+    {
+        if (mapped_regions->find(v) == mapped_regions->end())
+            continue;
+        else {
+            is_cxl_access = true;
+            break;
+        }
+    }
 
     DPRINTF(CXLSimGem5, "Rcvd req %s,%lu,%#lx\n", pkt->isRead()?"R":"W", id, addr);
-
 
     bool enqueue_success = false;
     if (pkt->isRead()) 
@@ -231,7 +243,7 @@ CXLSimGem5::recvTimingReq(PacketPtr pkt)
                 panic_if(pendingRequests.find(rid) != pendingRequests.end(), "Pkt found after deletion\n");
                 DPRINTF(CXLSimGem5, "Read for ID: %lu, Addr: %#lx completed\n", rid, pkt->getAddr());
 
-            });
+            }, is_cxl_access);
 
         if (enqueue_success) 
         {
@@ -272,7 +284,7 @@ CXLSimGem5::recvTimingReq(PacketPtr pkt)
                 pendingRequests.erase(rid);
                 panic_if(pendingRequests.find(rid) != pendingRequests.end(), "Pkt found after deletion\n");
                 DPRINTF(CXLSimGem5, "Write for ID: %lu, Addr: %#lx completed\n", rid, pkt->getAddr());
-            });
+            }, is_cxl_access);
 
         if (enqueue_success) 
         {
