@@ -36,7 +36,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--mem",
-    help="Memory type: ramulator2, simplemem, atomicmem, cxlsim",
+    help="Memory type: ramulator2, simplemem, atomicmem, cxlsim, dummymem",
     default="atomicmem",
 )
 parser.add_argument(
@@ -178,6 +178,15 @@ elif args.mem == "ramulator2":
     mem_ctrl.range = system.mem_ranges[0]
     mem_ctrl.port = system.membus.mem_side_ports
     mem_ctrl.record = args.record
+    system.mem_ctrl = mem_ctrl
+elif args.mem == "dummymem":
+    #Make sure memory mode is atomic
+    assert args.mem_mode == "timing", f"DummyMem only supports timing mode, not {args.mem_mode}"
+    assert args.cpu != "atomic", f"DummyMem only supports timing/O3 cpu, not {args.cpu}"
+    mem_ctrl = DummyMem()
+    mem_ctrl.range = system.mem_ranges[0]
+    mem_ctrl.record = args.record
+    mem_ctrl.port = system.membus.mem_side_ports
     system.mem_ctrl = mem_ctrl
 else:
     print(f"Unknown memory {args.mem}")

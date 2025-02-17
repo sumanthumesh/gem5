@@ -49,17 +49,8 @@ class DummyMem : public AbstractMemory
 
     bool retryReq;
     bool retryResp;
-    Tick startTick;
     std::unordered_map<Addr, std::deque<PacketPtr>> outstandingReads;
     std::unordered_map<Addr, std::deque<PacketPtr>> outstandingWrites;
-
-    /**
-     * Count the number of outstanding transactions so that we can
-     * block any further requests until there is space in DummyMem and
-     * the sending queue we need to buffer the response packets.
-     */
-    unsigned int nbrOutstandingReads;
-    unsigned int nbrOutstandingWrites;
 
     /**
      * Queue to hold response packets until we can send them
@@ -86,16 +77,6 @@ class DummyMem : public AbstractMemory
      * Event to schedule sending of responses
      */
     EventFunctionWrapper sendResponseEvent;
-
-    /**
-     * Progress the controller one clock cycle.
-     */
-    void tick();
-
-    /**
-     * Event to schedule clock ticks
-     */
-    EventFunctionWrapper tickEvent;
 
     /**
      * Upstream caches need this packet until true is returned, so

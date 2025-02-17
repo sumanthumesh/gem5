@@ -68,6 +68,8 @@ SimObject('SerialLink.py', sim_objects=['SerialLink'])
 SimObject('MemDelay.py', sim_objects=['MemDelay', 'SimpleMemDelay'])
 SimObject('PortTerminator.py', sim_objects=['PortTerminator'])
 SimObject('ThreadBridge.py', sim_objects=['ThreadBridge'])
+SimObject('DummyMem.py', sim_objects=['DummyMem'])
+
 
 Source('abstract_mem.cc')
 Source('addr_mapper.cc')
@@ -105,6 +107,7 @@ Source('htm.cc')
 Source('serial_link.cc')
 Source('mem_delay.cc')
 Source('port_terminator.cc')
+Source('dummymem.cc')
 
 GTest('backdoor_manager.test', 'backdoor_manager.test.cc',
       'backdoor_manager.cc', with_tag('gem5_trace'))
@@ -182,3 +185,4 @@ DebugFlag('TokenPort')
 DebugFlag("MemChecker")
 DebugFlag("MemCheckerMonitor")
 DebugFlag("QOS")
+DebugFlag("DummyMem")
