@@ -97,7 +97,7 @@ CXLSimGem5::sendResponse()
     assert(!retryResp);
     assert(!responseQueue.empty());
 
-    DPRINTF(CXLSimGem5, "Attempting to send response for %lu\n", responseQueue.front()->id);
+    DPRINTF(CXLSimGem5, "Attempting to send response for %lx\n", responseQueue.front()->getAddr());
 
     bool success = port.sendTimingResp(responseQueue.front());
     if (success) {
@@ -105,7 +105,7 @@ CXLSimGem5::sendResponse()
         auto pkt = responseQueue.front();
         if(record)
             record_file_ptr<<"R,"<<std::hex<<pkt->getAddr()<<","<<(pkt->isRead()?"R":"W")<<"\n";
-        DPRINTF(CXLSimGem5, "Sent response for %lu\n", responseQueue.front()->id);
+        DPRINTF(CXLSimGem5, "Sent response for %lx\n", responseQueue.front()->getAddr());
         responseQueue.pop_front();
 
         DPRINTF(CXLSimGem5, "Have %d read, %d write, %d responses outstanding\n",
@@ -224,7 +224,7 @@ CXLSimGem5::recvTimingReq(PacketPtr pkt)
         // Generate ramulator READ request and try to send to ramulator's memory system
         enqueue_success = mem_model->add_external_req(addr, op, id, 
             [this, addr](uint64_t rid) {
-                panic_if(pendingRequests.find(rid) == pendingRequests.end(), "Request %lu not found in pendingRequests\n", rid);
+                panic_if(pendingRequests.find(rid) == pendingRequests.end(), "Request %lu not found in pendingRequests @%lu\n", rid, curTick());
                 PacketPtr &pkt = pendingRequests.find(rid)->second;
                 panic_if(addr != pkt->getAddr(), "Captured address %#lx and packet address %#lx do not match\n", addr, pkt->getAddr());
                 DPRINTF(CXLSimGem5, "Callback for ID: %lu, Addr: %#lx\n", rid, pkt->getAddr());
