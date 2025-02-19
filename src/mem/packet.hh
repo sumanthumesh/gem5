@@ -806,6 +806,7 @@ class Packet : public Printable, public Extensible<Packet>
     void copyError(Packet *pkt) { assert(pkt->isError()); cmd = pkt->cmd; }
 
     Addr getAddr() const { assert(flags.isSet(VALID_ADDR)); return addr; }
+    bool isValidAddr() const { return flags.isSet(VALID_ADDR);}
     /**
      * Update the address of this packet mid-transaction. This is used
      * by the address mapper to change an already set address to a new
