@@ -224,8 +224,11 @@ CXLSimGem5::recvTimingReq(PacketPtr pkt)
         // Generate ramulator READ request and try to send to ramulator's memory system
         enqueue_success = mem_model->add_external_req(addr, op, id, 
             [this, addr](uint64_t rid) {
+                std::cout<<"Callback for ID:" << rid << std::endl;
                 panic_if(pendingRequests.find(rid) == pendingRequests.end(), "Request %lu not found in pendingRequests @%lu\n", rid, curTick());
-                PacketPtr &pkt = pendingRequests.find(rid)->second;
+                PacketPtr pkt = pendingRequests.find(rid)->second;
+                std::cout<<"Retrieved Pkt id "<<pkt->id<<std::endl;
+                panic_if(!pkt->isValidAddr(), "Valid addr flag is not set for pkt %lu", pkt->id);
                 panic_if(addr != pkt->getAddr(), "Captured address %#lx and packet address %#lx do not match\n", addr, pkt->getAddr());
                 DPRINTF(CXLSimGem5, "Callback for ID: %lu, Addr: %#lx\n", rid, pkt->getAddr());
 
@@ -247,10 +250,12 @@ CXLSimGem5::recvTimingReq(PacketPtr pkt)
 
         if (enqueue_success) 
         {
-            DPRINTF(CXLSimGem5, "Added read id %lu to mem_model\n", id);
+            DPRINTF(CXLSimGem5, "Added read id %lu pkt id %lu addr %#lx to mem_model\n", id, pkt->id, pkt->getAddr());
             // outstandingReads[pkt->getAddr()].push_back(pkt);
             panic_if(pendingRequests.find(id) != pendingRequests.end(), "Request already exists in pendingRequests\n");
             pendingRequests.insert({id,pkt});
+            PacketPtr p = pendingRequests.find(id)->second;
+            DPRINTF(CXLSimGem5, "Verification read id %lu pkt id %lu addr %#lx\n", id, p->id, p->getAddr());
             // we count a transaction as outstanding until it has left the
             // queue in the controller, and the response has been sent
             // back, note that this will differ for reads and writes
@@ -268,9 +273,12 @@ CXLSimGem5::recvTimingReq(PacketPtr pkt)
         // Generate ramulator READ request and try to send to ramulator's memory system
         enqueue_success = mem_model->add_external_req(addr, op, id, 
             [this, addr](uint64_t rid) {
+                std::cout<<"Callback for ID:" << rid << std::endl;
                 panic_if(pendingRequests.find(rid) == pendingRequests.end(), "Request %lu not found in pendingRequests\n", rid);
-                PacketPtr &pkt = pendingRequests.find(rid)->second;
-                // panic_if(addr != pkt->getAddr(), "Captured address %#lx and packet address %#lx do not match\n", addr, pkt->getAddr());
+                PacketPtr pkt = pendingRequests.find(rid)->second;
+                std::cout<<"Retrieved Pkt id "<<pkt->id<<std::endl;
+                panic_if(!pkt->isValidAddr(), "Valid addr flag is not set for pkt %lu", pkt->id);
+                panic_if(addr != pkt->getAddr(), "Captured address %#lx and packet address %#lx do not match\n", addr, pkt->getAddr());
                 DPRINTF(CXLSimGem5, "Callback for ID: %lu, Addr: %#lx\n", rid, pkt->getAddr());
 
                 // added counter to track requests in flight
@@ -288,10 +296,15 @@ CXLSimGem5::recvTimingReq(PacketPtr pkt)
 
         if (enqueue_success) 
         {
-            DPRINTF(CXLSimGem5, "Added write id %lu to mem_model\n", id);
+            DPRINTF(CXLSimGem5, "Added write id %lu pkt id %lu addr %#lx to mem_model\n", id, pkt->id, pkt->getAddr());
             // outstandingReads[pkt->getAddr()].push_back(pkt);
             panic_if(pendingRequests.find(id) != pendingRequests.end(), "Request already exists in pendingRequests\n");
             pendingRequests.insert({id,pkt});
+            PacketPtr p = pendingRequests.find(id)->second;
+            DPRINTF(CXLSimGem5, "Verification write id %lu pkt id %lu addr %#lx\n", id, p->id, p->getAddr());
+            if (id == 546) {
+                std::cout<<"Debug"<<std::endl;
+            }
             // we count a transaction as outstanding until it has left the
             // queue in the controller, and the response has been sent
             // back, note that this will differ for reads and writes
