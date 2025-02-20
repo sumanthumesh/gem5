@@ -380,8 +380,10 @@ CXLSimGem5::recvTimingReq(PacketPtr pkt)
         if (system()->isMemRegionROI())
         {
             // Implement region of interest counter
-            cxl_accesses_roi++;
-            dam_accesses_roi++;
+            if (is_cxl_access)
+                cxl_accesses_roi++;
+            else
+                dam_accesses_roi++;
             find_accessed_region(pkt->req->hasVaddr()?((pkt->req->getVaddr()>>6)<<6):0,pkt->req->getSize());
         }
         // Increment the per region counts
