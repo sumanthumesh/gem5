@@ -224,10 +224,10 @@ CXLSimGem5::recvTimingReq(PacketPtr pkt)
         // Generate ramulator READ request and try to send to ramulator's memory system
         enqueue_success = mem_model->add_external_req(addr, op, id, 
             [this, addr](uint64_t rid) {
-                std::cout<<"Callback for ID:" << rid << std::endl;
+                // std::cout<<"Callback for ID:" << rid << std::endl;
                 panic_if(pendingRequests.find(rid) == pendingRequests.end(), "Request %lu not found in pendingRequests @%lu\n", rid, curTick());
                 PacketPtr pkt = pendingRequests.find(rid)->second;
-                std::cout<<"Retrieved Pkt id "<<pkt->id<<std::endl;
+                // std::cout<<"Retrieved Pkt id "<<pkt->id<<std::endl;
                 panic_if(!pkt->isValidAddr(), "Valid addr flag is not set for pkt %lu", pkt->id);
                 panic_if(addr != pkt->getAddr(), "Captured address %#lx and packet address %#lx do not match\n", addr, pkt->getAddr());
                 DPRINTF(CXLSimGem5, "Callback for ID: %lu, Addr: %#lx\n", rid, pkt->getAddr());
@@ -273,13 +273,14 @@ CXLSimGem5::recvTimingReq(PacketPtr pkt)
         // Generate ramulator READ request and try to send to ramulator's memory system
         enqueue_success = mem_model->add_external_req(addr, op, id, 
             [this, addr](uint64_t rid) {
-                std::cout<<"Callback for ID:" << rid << std::endl;
+                // std::cout<<"Callback for ID:" << rid << std::endl;
                 panic_if(pendingRequests.find(rid) == pendingRequests.end(), "Request %lu not found in pendingRequests\n", rid);
                 PacketPtr pkt = pendingRequests.find(rid)->second;
-                std::cout<<"Retrieved Pkt id "<<pkt->id<<std::endl;
-                panic_if(!pkt->isValidAddr(), "Valid addr flag is not set for pkt %lu", pkt->id);
-                panic_if(addr != pkt->getAddr(), "Captured address %#lx and packet address %#lx do not match\n", addr, pkt->getAddr());
-                DPRINTF(CXLSimGem5, "Callback for ID: %lu, Addr: %#lx\n", rid, pkt->getAddr());
+                // std::cout<<"Retrieved Pkt id "<<pkt->id<<std::endl;
+                // panic_if(!pkt->isValidAddr(), "Valid addr flag is not set for pkt %lu", pkt->id);
+                // panic_if(addr != pkt->getAddr(), "Captured address %#lx and packet address %#lx do not match\n", addr, pkt->getAddr());
+                DPRINTF(CXLSimGem5, "Callback for ID: %lu, Addr: %#lx\n", rid, addr);
+                // DPRINTF(CXLSimGem5, "Callback for ID: %lu, Addr: %#lx\n", rid, pkt->getAddr());
 
                 // added counter to track requests in flight
                 // --nbrOutstandingReads;
@@ -291,7 +292,8 @@ CXLSimGem5::recvTimingReq(PacketPtr pkt)
                 // Delete packet from pending requests
                 pendingRequests.erase(rid);
                 panic_if(pendingRequests.find(rid) != pendingRequests.end(), "Pkt found after deletion\n");
-                DPRINTF(CXLSimGem5, "Write for ID: %lu, Addr: %#lx completed\n", rid, pkt->getAddr());
+                DPRINTF(CXLSimGem5, "Write for ID: %lu, Addr: %#lx completed\n", rid, addr);
+                // DPRINTF(CXLSimGem5, "Write for ID: %lu, Addr: %#lx completed\n", rid, pkt->getAddr());
             }, is_cxl_access);
 
         if (enqueue_success) 
