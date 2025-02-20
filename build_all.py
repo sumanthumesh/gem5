@@ -12,7 +12,7 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description="Process arguments.")
 
-    parser.add_argument("optional_arg", nargs="?", help="An optional positional argument")
+    parser.add_argument("optional_args", nargs="*", help="An optional positional argument")
     parser.add_argument("-n", help="Number of parallel workers per build", type=int, default=16)
     parser.add_argument("-p", help="Number of parallel builds", type=int, default=1)
 
@@ -22,9 +22,11 @@ if __name__ == "__main__":
     
     opts = []
     
+    print(args.optional_args)
+
     cwd = os.path.abspath(os.path.curdir)
     build_path = os.path.join(cwd,"build/X86")
-    if args.optional_arg == None:
+    if args.optional_args == None:
         opts = possible_opts
     else:
         for opt in args.optional_args:
