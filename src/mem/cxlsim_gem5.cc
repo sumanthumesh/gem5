@@ -23,7 +23,8 @@ CXLSimGem5::CXLSimGem5(const Params &p) :
     retryReq(false), retryResp(false), startTick(0),
     nbrOutstandingReads(0), nbrOutstandingWrites(0),
     sendResponseEvent([this]{ sendResponse(); }, name()),
-    tickEvent([this]{ tick(); }, name()), record(p.record), num_reads(0), num_writes(0), req_id(0), record_file("record_cxlsim.dat")
+    tickEvent([this]{ tick(); }, name()), record(p.record), num_reads(0), num_writes(0), req_id(0), record_file("record_cxlsim.dat"),
+    cxl_accesses(0), dam_accesses(0)
 {
     DPRINTF(CXLSimGem5, "Instantiated CXLSimGem5 \n");
 
@@ -50,6 +51,8 @@ CXLSimGem5::CXLSimGem5(const Params &p) :
         std::cout<<"Finished CXL Simulation\n";    
         std::cout<<"NUM READS : "<<num_reads<<"\n";
         std::cout<<"NUM WRITES: "<<num_writes<<"\n";
+        std::cout<<"NUM CXL   : "<<cxl_accesses<<"\n";
+        std::cout<<"NUM DAM   : "<<dam_accesses<<"\n";
         // Close the record file
         if (record)
             record_file_ptr.close();
@@ -261,7 +264,6 @@ CXLSimGem5::recvTimingReq(PacketPtr pkt)
             // back, note that this will differ for reads and writes
             // ++nbrOutstandingReads;
             num_reads++;
-            req_id++;
         } 
         else 
         {
@@ -313,7 +315,6 @@ CXLSimGem5::recvTimingReq(PacketPtr pkt)
             // ++nbrOutstandingReads;
             accessAndRespond(pkt);
             num_writes++;
-            req_id++;
         } 
         else 
         {
@@ -364,12 +365,26 @@ CXLSimGem5::recvTimingReq(PacketPtr pkt)
     }
     if (enqueue_success)
     {
+        // Increment counters
+        req_id++;
+        if (is_cxl_access)
+            cxl_accesses++;
+        else
+            dam_accesses++;
         // Find out if this access was part of a special memory region and update the per region counters
         // Remember to give the virtual address here, not physical address
         // Also ensure it aligns to 64 byte cacheline
         if (system()->isMemRegionROI())
         {
             find_accessed_region(pkt->req->hasVaddr()?((pkt->req->getVaddr()>>6)<<6):0,pkt->req->getSize());
+        }
+        // Increment the per region counts
+        for (auto &r : accessed_regions)
+        {
+            if (region_access_counts.find(r) == region_access_counts.end())
+                region_access_counts[r] = 1;
+            else
+                region_access_counts[r]++;
         }
         if (record)
             record_file_ptr<<"E,"<<std::hex<<pkt->getAddr()<<","<<(pkt->isRead()?"R":"W")<<"\n";

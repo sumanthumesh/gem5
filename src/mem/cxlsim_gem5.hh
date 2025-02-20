@@ -121,6 +121,7 @@ class CXLSimGem5 : public AbstractMemory
      * Counters to count number of reads and writes
      */
     uint64_t num_reads, num_writes;
+    uint64_t cxl_accesses, dam_accesses;
 
     /**
      * Custom req id counter
