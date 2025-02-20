@@ -7,7 +7,6 @@
 
 #include "mem/abstract_mem.hh"
 #include "params/DummyMem.hh"
-#include "simple_mem/simple_mem.hh"
 
 
 
