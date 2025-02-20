@@ -122,7 +122,7 @@ class CXLSimGem5 : public AbstractMemory
      */
     uint64_t num_reads, num_writes;
     uint64_t cxl_accesses, dam_accesses;
-
+    uint64_t cxl_accesses_roi, dam_accesses_roi;
     /**
      * Custom req id counter
      */

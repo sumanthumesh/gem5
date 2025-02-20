@@ -24,7 +24,7 @@ CXLSimGem5::CXLSimGem5(const Params &p) :
     nbrOutstandingReads(0), nbrOutstandingWrites(0),
     sendResponseEvent([this]{ sendResponse(); }, name()),
     tickEvent([this]{ tick(); }, name()), record(p.record), num_reads(0), num_writes(0), req_id(0), record_file("record_cxlsim.dat"),
-    cxl_accesses(0), dam_accesses(0)
+    cxl_accesses(0), dam_accesses(0), cxl_accesses_roi(0), dam_accesses_roi(0)
 {
     DPRINTF(CXLSimGem5, "Instantiated CXLSimGem5 \n");
 
@@ -49,10 +49,12 @@ CXLSimGem5::CXLSimGem5(const Params &p) :
 
     registerExitCallback([this]() {
         std::cout<<"Finished CXL Simulation\n";    
-        std::cout<<"NUM READS : "<<num_reads<<"\n";
-        std::cout<<"NUM WRITES: "<<num_writes<<"\n";
-        std::cout<<"NUM CXL   : "<<cxl_accesses<<"\n";
-        std::cout<<"NUM DAM   : "<<dam_accesses<<"\n";
+        std::cout<<"NUM READS       : "<<num_reads<<"\n";
+        std::cout<<"NUM WRITES      : "<<num_writes<<"\n";
+        std::cout<<"NUM CXL         : "<<cxl_accesses<<"\n";
+        std::cout<<"NUM DAM         : "<<dam_accesses<<"\n";
+        std::cout<<"NUM CXL in ROI  : "<<cxl_accesses_roi<<"\n";
+        std::cout<<"NUM DAM in ROI  : "<<dam_accesses_roi<<"\n";
         // Close the record file
         if (record)
             record_file_ptr.close();
@@ -371,11 +373,15 @@ CXLSimGem5::recvTimingReq(PacketPtr pkt)
             cxl_accesses++;
         else
             dam_accesses++;
+        
         // Find out if this access was part of a special memory region and update the per region counters
         // Remember to give the virtual address here, not physical address
         // Also ensure it aligns to 64 byte cacheline
         if (system()->isMemRegionROI())
         {
+            // Implement region of interest counter
+            cxl_accesses_roi++;
+            dam_accesses_roi++;
             find_accessed_region(pkt->req->hasVaddr()?((pkt->req->getVaddr()>>6)<<6):0,pkt->req->getSize());
         }
         // Increment the per region counts
