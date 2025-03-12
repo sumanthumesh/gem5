@@ -133,6 +133,10 @@ DummyMem::recvTimingReq(PacketPtr pkt)
     if (retryReq)
         return false;
 
+    if (record) {
+        record_file_ptr << std::dec << curTick() << " " << std::hex << (pkt->req->hasVaddr() ? pkt->req->getVaddr() : pkt->getAddr()) << " " << (pkt->isRead() ? "R" : "W") << std::endl;
+    }
+
     bool enqueue_success = false;
     if (pkt->isRead()) 
     {
@@ -168,10 +172,6 @@ DummyMem::accessAndRespond(PacketPtr pkt)
     bool needsResponse = pkt->needsResponse();
 
     access(pkt);
-    if(record)
-    {
-        record_file_ptr<<std::dec<<req_id<<" "<<curTick()<<" 0x"<<std::hex<<(pkt->req->hasVaddr()?pkt->req->getVaddr():0)<<" "<<(pkt->isRead()?"R":"W")<<"\n";
-    }
 
     // turn packet around to go back to requestor if response expected
     if (needsResponse) {
