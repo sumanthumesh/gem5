@@ -579,13 +579,13 @@ void m5memregioncmd(ThreadContext *tc, size_t n) {
     case 2: //Start region of interest where we track accesses
     {
         tc->getSystemPtr()->memRegionROIStart();
-        std::cout<<"Setting MemRegionROI to "<<(tc->getSystemPtr()->isMemRegionROI()?"True":"False")<<"\n";
+        std::cout<<"Setting MemRegionROI to "<<(tc->getSystemPtr()->isMemRegionROI()?"True":"False")<<std::endl;
         break;
     }
     case 3: //End region of interest where we track accesses
     {
         tc->getSystemPtr()->memRegionROIEnd();
-        std::cout<<"Setting MemRegionROI to "<<(tc->getSystemPtr()->isMemRegionROI()?"True":"False")<<"\n";
+        std::cout<<"Setting MemRegionROI to "<<(tc->getSystemPtr()->isMemRegionROI()?"True":"False")<<std::endl;
         break;
     }
     case 4: // Load mapping
