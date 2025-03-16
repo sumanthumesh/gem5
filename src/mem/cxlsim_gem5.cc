@@ -108,8 +108,8 @@ CXLSimGem5::sendResponse()
     if (success) {
         // Note down the callback order
         auto pkt = responseQueue.front();
-        if(record)
-            record_file_ptr<<"R,"<<std::hex<<pkt->getAddr()<<","<<(pkt->isRead()?"R":"W")<<"\n";
+        // if(record)
+        //     record_file_ptr<<"R,"<<std::hex<<pkt->getAddr()<<","<<(pkt->isRead()?"R":"W")<<"\n";
         DPRINTF(CXLSimGem5, "Sent response for %lx\n", responseQueue.front()->getAddr());
         responseQueue.pop_front();
 
@@ -207,6 +207,8 @@ CXLSimGem5::recvTimingReq(PacketPtr pkt)
     CXL::opcode op = pkt->isRead() ? CXL::opcode::Req : CXL::opcode::RwD;
     
     std::vector<size_t> accessed_regions = find_accessed_region(pkt->req->hasVaddr()?((pkt->req->getVaddr()>>6)<<6):0,pkt->req->getSize());
+    // if(accessed_regions.size()>0)
+    //     std::cout<<(pkt->req->hasVaddr()?((pkt->req->getVaddr()>>6)<<6):0)<<std::endl;
     bool is_cxl_access = false;
     auto mapped_regions = system()->getMappedRegions();
     // See if any accessed region is part of mapped region, if so it should goto CXL
@@ -243,8 +245,8 @@ CXLSimGem5::recvTimingReq(PacketPtr pkt)
                 accessAndRespond(pkt);
 
                 // Note down the callback order
-                if(record)
-                    record_file_ptr<<"C,"<<std::hex<<pkt->getAddr()<<","<<(pkt->isRead()?"R":"W")<<"\n";
+                // if(record)
+                //     record_file_ptr<<"C,"<<std::hex<<pkt->getAddr()<<","<<(pkt->isRead()?"R":"W")<<"\n";
 
                 // Delete packet from pending requests
                 pendingRequests.erase(rid);
@@ -389,13 +391,14 @@ CXLSimGem5::recvTimingReq(PacketPtr pkt)
         // Increment the per region counts
         for (auto &r : accessed_regions)
         {
+            // std::cout<<"INCR"<<std::endl;
             if (region_access_counts.find(r) == region_access_counts.end())
                 region_access_counts[r] = 1;
             else
                 region_access_counts[r]++;
         }
         if (record)
-            record_file_ptr<<"E,"<<std::hex<<pkt->getAddr()<<","<<(pkt->isRead()?"R":"W")<<"\n";
+            record_file_ptr << std::dec << curTick() << " " << std::hex << (pkt->req->hasVaddr() ? pkt->req->getVaddr() : 0) << " " << (pkt->isRead() ? "R" : "W") << std::endl;
     }
 
     return enqueue_success;
