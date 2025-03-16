@@ -26,7 +26,7 @@ if __name__ == "__main__":
 
     cwd = os.path.abspath(os.path.curdir)
     build_path = os.path.join(cwd,"build/X86")
-    if args.optional_args == None:
+    if len(args.optional_args) == 0:
         opts = possible_opts
     else:
         for opt in args.optional_args:
