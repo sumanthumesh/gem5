@@ -536,17 +536,23 @@ std::vector<size_t> AbstractMemory::find_accessed_region(Addr addr, unsigned siz
             return true;
         return false;
     };
-
     // This is the vector of region_id we will return
     std::vector<size_t> detected_regions;
+    // If there are no addr regions, return immediately
+    auto addr_regions = system()->get_special_addr_regions();
+    if (addr_regions->size() == 0)
+        return detected_regions;
+
     // Make sure that address region exists
     panic_if(system()->get_special_addr_regions()==nullptr, "Special address regions not allocated\n");
     // Find the first start of an address range that is >= the given address
-    auto addr_regions = system()->get_special_addr_regions();
     auto lb = addr_regions->lower_bound(addr);
     // If no lower bound found, return empty vector
-    if(lb == addr_regions->end())
+    if(lb == addr_regions->end()){
+        if(addr < addr_regions->rbegin()->second.first)
+            detected_regions.push_back(addr_regions->rbegin()->second.second);
         return detected_regions;
+    }
     // Now, check if there is any overlap with lb
     auto it = lb;
     if(is_overlap(it->first, it->second.first, addr, size))
