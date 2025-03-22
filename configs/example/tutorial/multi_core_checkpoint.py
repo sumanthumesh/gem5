@@ -72,6 +72,16 @@ parser.add_argument(
     help="Config file for cxlsim",
     default=None
 )
+parser.add_argument(
+    "--all-dam",
+    help="Set to true if all accesses need to goto DAM",
+    action="store_true"
+)
+parser.add_argument(
+    "--all-cxl",
+    help="Set to true if all accesses need to goto CXL",
+    action="store_true"
+)
 
 
 args = parser.parse_args()
@@ -198,6 +208,15 @@ elif args.mem == "cxlsim":
         mem_ctrl.config_path = "/data2/sumanthu/gem5/ext/cxlsim/cxlsim/ramulator/configs/DDR4-config.cfg"
     else:
         mem_ctrl.config_path = os.path.abspath(args.cxlsim_config)
+        print(f"Using {args.cxlsim_config}")
+    if args.all_dam:
+        mem_ctrl.all_dam = True
+    else:
+        mem_ctrl.all_dam = False
+    if args.all_cxl:
+        mem_ctrl.all_cxl = True
+    else:
+        mem_ctrl.all_cxl = False
     mem_ctrl.skip_cycle = False
     mem_ctrl.record = args.record
     system.mem_ctrl = mem_ctrl
