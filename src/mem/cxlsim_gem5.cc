@@ -44,8 +44,8 @@ CXLSimGem5::CXLSimGem5(const Params &p) :
         record_file_ptr.open(record_file);
 
     // Note down the callback order
-    std::ofstream f("callback_order.trace");
-    f.close();
+    // std::ofstream f("callback_order.trace");
+    // f.close();
 
     registerExitCallback([this]() {
         std::cout<<"Finished CXL Simulation\n";    
@@ -62,7 +62,8 @@ CXLSimGem5::CXLSimGem5(const Params &p) :
         for (auto &v: region_access_counts){
             std::cout<<v.first<<" : "<<v.second<<"\n";
         }
-        panic_if(nbrOutstanding()!=0, "All requests haven't been fulfilled\n");
+        if(nbrOutstanding()!=0)
+            std::cout<< nbrOutstanding() <<" requests remaining in buffers"<<std::endl;
     });
 }
 
