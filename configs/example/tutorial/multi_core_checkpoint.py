@@ -55,6 +55,23 @@ parser.add_argument(
     help="Memory mode: timing, atomic",
     default="timing",
 )
+parser.add_argument(
+    "--repeat-checkpoint",
+    type=int,
+    help="Repeatedly take checkpoint after these many instructions",
+    default=None,
+)
+parser.add_argument(
+    "--bus-width",
+    type=int,
+    help="Specify the system bus width",
+    default=128,
+)
+parser.add_argument(
+    "--cxlsim-config",
+    help="Config file for cxlsim",
+    default=None
+)
 
 
 args = parser.parse_args()
@@ -87,6 +104,9 @@ system.mem_ranges = [AddrRange("8GB")]
 
 # Memory bus
 system.membus = SystemXBar()
+if args.bus_width != None:
+    system.membus.width = args.bus_width
+
 
 # Create CPUs
 if args.checkpoint_dir:
@@ -102,9 +122,11 @@ else:
 
 if not args.no_cache:
     # system.l3cache = L3Cache(size="8MB", assoc=16)  # Shared L3 cache
-    system.l3cache = L3Cache(size="16kB", assoc=16)  # Shared L3 cache
+    system.l3cache = L3Cache(size=f"2MB", assoc=16)  # Shared L3 cache
 
     system.l2_to_l3bus = SystemXBar()
+    if args.bus_width != None:
+        system.l2_to_l3bus.width = args.bus_width
 
 for cpu in system.cpus:
     # Interrupt stuff
@@ -117,8 +139,8 @@ for cpu in system.cpus:
         # Create L1 caches (private to each core)
         # cpu.icache = L1ICache(size="1kB", assoc=4)
         # cpu.dcache = L1DCache(size="32kB", assoc=4)
-        cpu.icache = L1ICache(size="1kB", assoc=4)
-        cpu.dcache = L1DCache(size="1kB", assoc=4)
+        cpu.icache = L1ICache(size="32kB", assoc=4)
+        cpu.dcache = L1DCache(size="32kB", assoc=4)
 
         # Connect CPU to L1
         cpu.icache_port = cpu.icache.cpu_side
@@ -126,10 +148,12 @@ for cpu in system.cpus:
 
         # Create L2
         # cpu.l2cache = L2Cache(size="256kB", assoc=8)
-        cpu.l2cache = L2Cache(size="8kB", assoc=8)
+        cpu.l2cache = L2Cache(size="256kB", assoc=8)
 
         # Create bus from L1 to L2
         cpu.l1_to_l2bus = L2XBar()
+        if args.bus_width != None:
+            cpu.l1_to_l2bus.width = args.bus_width
 
         # Connect L1 to bus
         cpu.icache.mem_side = cpu.l1_to_l2bus.cpu_side_ports
@@ -168,7 +192,12 @@ elif args.mem == "cxlsim":
     mem_ctrl.range = system.mem_ranges[0]
     mem_ctrl.tck = 1 / 1.6
     mem_ctrl.port = system.membus.mem_side_ports
-    mem_ctrl.config_path = "/data2/sumanthu/gem5/ext/cxlsim/cxlsim/ramulator/configs/DDR4-config.cfg"
+    if args.cxlsim_config == None:
+        print(f"CXLSIM config not specified")
+        print(f"Using /data2/sumanthu/gem5/ext/cxlsim/cxlsim/ramulator/configs/DDR4-config.cfg as default")
+        mem_ctrl.config_path = "/data2/sumanthu/gem5/ext/cxlsim/cxlsim/ramulator/configs/DDR4-config.cfg"
+    else:
+        mem_ctrl.config_path = os.path.abspath(args.cxlsim_config)
     mem_ctrl.skip_cycle = False
     mem_ctrl.record = args.record
     system.mem_ctrl = mem_ctrl
