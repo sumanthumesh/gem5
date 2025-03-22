@@ -204,8 +204,7 @@ elif args.mem == "cxlsim":
     mem_ctrl.port = system.membus.mem_side_ports
     if args.cxlsim_config == None:
         print(f"CXLSIM config not specified")
-        print(f"Using /data2/sumanthu/gem5/ext/cxlsim/cxlsim/ramulator/configs/DDR4-config.cfg as default")
-        mem_ctrl.config_path = "/data2/sumanthu/gem5/ext/cxlsim/cxlsim/ramulator/configs/DDR4-config.cfg"
+        exit(2)
     else:
         mem_ctrl.config_path = os.path.abspath(args.cxlsim_config)
         print(f"Using {args.cxlsim_config}")
