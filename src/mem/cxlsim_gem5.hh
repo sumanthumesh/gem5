@@ -127,6 +127,10 @@ class CXLSimGem5 : public AbstractMemory
      * Custom req id counter
      */
     uint64_t req_id;
+    /**
+     * Flags to set if we want all accesses to goto DAM or if all accesses should goto CXL
+     */
+    bool all_dam = false, all_cxl = false;
 
   public:
 

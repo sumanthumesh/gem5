@@ -24,7 +24,7 @@ CXLSimGem5::CXLSimGem5(const Params &p) :
     nbrOutstandingReads(0), nbrOutstandingWrites(0),
     sendResponseEvent([this]{ sendResponse(); }, name()),
     tickEvent([this]{ tick(); }, name()), record(p.record), num_reads(0), num_writes(0), req_id(0), record_file("record_cxlsim.dat"),
-    cxl_accesses(0), dam_accesses(0), cxl_accesses_roi(0), dam_accesses_roi(0)
+    cxl_accesses(0), dam_accesses(0), cxl_accesses_roi(0), dam_accesses_roi(0), all_cxl(p.all_cxl), all_dam(p.all_dam)
 {
     DPRINTF(CXLSimGem5, "Instantiated CXLSimGem5 \n");
 
@@ -46,6 +46,9 @@ CXLSimGem5::CXLSimGem5(const Params &p) :
     // Note down the callback order
     // std::ofstream f("callback_order.trace");
     // f.close();
+
+    // Make sure that all_cxl and all_dam are not set at the same time
+    panic_if(all_cxl & all_dam, "Both all_cxl and all_dam are set to true");
 
     registerExitCallback([this]() {
         std::cout<<"Finished CXL Simulation\n";    
@@ -204,24 +207,50 @@ CXLSimGem5::recvTimingReq(PacketPtr pkt)
     if (retryReq)
         return false;
 
+    /**
+     * How we decide whether to send access to CXL or DAM
+     * Setting the is_cxl_access variable means the access will goto CRAM and not DAM
+     * If all_dam is set, then is_cxl_access should always be false
+     * If all_cxl is set, then is_cxl_access should always be true
+     * If neither of all_dam or all_cxl is set,
+     * 1. Find out if any special regions are accessed
+     * 2. Check if this region is present in the mapped_regions
+     * 3. If it is in mapped regions, it is a CXL access, if not it will be a DAM access
+     */
+     
+    //Get address and opcode
     uint64_t addr = pkt->getAddr(), id = req_id;
     CXL::opcode op = pkt->isRead() ? CXL::opcode::Req : CXL::opcode::RwD;
-    
-    std::vector<size_t> accessed_regions = find_accessed_region(pkt->req->hasVaddr()?((pkt->req->getVaddr()>>6)<<6):0,pkt->req->getSize());
-    // if(accessed_regions.size()>0)
-    //     std::cout<<(pkt->req->hasVaddr()?((pkt->req->getVaddr()>>6)<<6):0)<<std::endl;
+    //Instantiate is_cxl_access
     bool is_cxl_access = false;
-    auto mapped_regions = system()->getMappedRegions();
-    // See if any accessed region is part of mapped region, if so it should goto CXL
-    for (auto &v: accessed_regions)
+    //Variable to store accessed regions
+    std::vector<size_t> accessed_regions;
+    //Check if all_dam is set
+    if(all_dam)
     {
-        if (mapped_regions->find(v) == mapped_regions->end())
-            continue;
-        else {
-            is_cxl_access = true;
-            break;
+        is_cxl_access = false;
+    }
+    else if(all_cxl)
+    {
+        is_cxl_access = true;
+    }
+    else
+    {
+        accessed_regions = find_accessed_region(pkt->req->hasVaddr()?((pkt->req->getVaddr()>>6)<<6):0,pkt->req->getSize());
+        auto mapped_regions = system()->getMappedRegions();
+        for (auto &v: accessed_regions)
+        {
+            if (mapped_regions->find(v) == mapped_regions->end())
+                continue;
+            else {
+                is_cxl_access = true;
+                break;
+            }
         }
     }
+    // if(accessed_regions.size()>0)
+    //     std::cout<<(pkt->req->hasVaddr()?((pkt->req->getVaddr()>>6)<<6):0)<<std::endl;
+    // See if any accessed region is part of mapped region, if so it should goto CXL
 
     DPRINTF(CXLSimGem5, "Rcvd req %s,%lu,%#lx\n", pkt->isRead()?"R":"W", id, addr);
 
@@ -387,7 +416,7 @@ CXLSimGem5::recvTimingReq(PacketPtr pkt)
                 cxl_accesses_roi++;
             else
                 dam_accesses_roi++;
-            find_accessed_region(pkt->req->hasVaddr()?((pkt->req->getVaddr()>>6)<<6):0,pkt->req->getSize());
+            // find_accessed_region(pkt->req->hasVaddr()?((pkt->req->getVaddr()>>6)<<6):0,pkt->req->getSize());
         }
         // Increment the per region counts
         for (auto &r : accessed_regions)
