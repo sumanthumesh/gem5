@@ -6,9 +6,15 @@
 #include "debug/Drain.hh"
 #include "sim/system.hh"
 
+#include "CXLStats.h"
+
 // spdlog collides with gem5...
 #pragma push_macro("warn")
 #undef warn
+
+namespace CXL{
+    extern CXLStats stats;
+}
 
 namespace gem5
 {
@@ -58,6 +64,8 @@ CXLSimGem5::CXLSimGem5(const Params &p) :
         std::cout<<"NUM DAM         : "<<dam_accesses<<"\n";
         std::cout<<"NUM CXL in ROI  : "<<cxl_accesses_roi<<"\n";
         std::cout<<"NUM DAM in ROI  : "<<dam_accesses_roi<<"\n";
+        std::cout<<"Stats from inside CXLSIM\n";
+        std::cout<<CXL::stats.sprint();    
         // Close the record file
         if (record)
             record_file_ptr.close();
