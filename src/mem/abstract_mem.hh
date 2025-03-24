@@ -231,6 +231,8 @@ class AbstractMemory : public ClockedObject
 
     void initState() override;
 
+    virtual void warmUp() {}
+
     /**
      * See if this is a null memory that should never store data and
      * always return zero.
