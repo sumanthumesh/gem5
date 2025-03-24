@@ -216,6 +216,8 @@ elif args.mem == "cxlsim":
         mem_ctrl.all_cxl = True
     else:
         mem_ctrl.all_cxl = False
+    mem_ctrl.page_size = 4096
+    mem_ctrl.dam_size = 4
     mem_ctrl.skip_cycle = False
     mem_ctrl.record = args.record
     system.mem_ctrl = mem_ctrl
