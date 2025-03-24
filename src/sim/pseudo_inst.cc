@@ -614,7 +614,7 @@ void m5memregioncmd(ThreadContext *tc, size_t n) {
             // Add region id
             tc->getSystemPtr()->getMappedRegions()->insert(region_id);
         }
-        std::cout << "Finished loading " << tc->getSystemPtr()->getMappedRegions()->size() << " from file" << std::endl;
+        std::cout << "Finished loading " << tc->getSystemPtr()->getMappedRegions()->size() << " from "<< map_file << std::endl;
 
         //Call the memory's warmup function
         tc->getSystemPtr()->getFirstDeviceMemory()->warmUp();
