@@ -97,7 +97,12 @@ class PageManager
             if(mapped_regions->find(region_id)!=mapped_regions->end())
             {
                 //It is a mapped region
-                uint64_t num_pages = (uint64_t)std::ceil((x.second.first - x.first)/page_size);
+                uint64_t num_pages = (uint64_t)std::ceil((x.second.first - x.first)/(float)page_size);
+                // std::cout<<"Detected mapped region "<<region_id<<std::endl;
+                // std::cout<<"Num Pages "<<num_pages<<std::endl;
+                // std::cout<<"Page size "<<page_size<<std::endl;
+                // std::cout<<"Start "<<std::hex<<x.first<<std::dec<<std::endl;
+                // std::cout<<"End "<<std::hex<<x.second.first<<std::dec<<std::endl;
                 num_mapped_pages += num_pages;
             }
         }
