@@ -62,6 +62,7 @@
 #include "dev/net/dist_iface.hh"
 #include "mem/se_translating_port_proxy.hh"
 #include "mem/translating_port_proxy.hh"
+#include "mem/abstract_mem.hh"
 #include "params/BaseCPU.hh"
 #include "sim/full_system.hh"
 #include "sim/process.hh"
@@ -614,6 +615,10 @@ void m5memregioncmd(ThreadContext *tc, size_t n) {
             tc->getSystemPtr()->getMappedRegions()->insert(region_id);
         }
         std::cout << "Finished loading " << tc->getSystemPtr()->getMappedRegions()->size() << " from file" << std::endl;
+
+        //Call the memory's warmup function
+        tc->getSystemPtr()->getFirstDeviceMemory()->warmUp();
+        
         break;
     }
     default: {
