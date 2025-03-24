@@ -9,6 +9,7 @@
 
 #include "mem/abstract_mem.hh"
 #include "params/CXLSimGem5.hh"
+#include <limits>
 
 namespace gem5
 {
@@ -72,7 +73,7 @@ class PageRegion {
 class PageManager
 {
   private:
-    std::unique_ptr<PageRegion> dam_temp;
+    std::unique_ptr<PageRegion> dam_temp,dam_table,cxl_table,cxl_temp;
     size_t page_size; //In Bytes
     size_t dam_size; //In number of pages
     size_t num_mapped_pages;
@@ -81,10 +82,24 @@ class PageManager
     page_size(page_size), dam_size(dam_size)
     {
         // Warmup
-        // dam_table = std::make_unique<PageRegion>(page_size,dam_table_size);
+        dam_table = std::make_unique<PageRegion>(page_size,std::numeric_limits<size_t>::max());
         dam_temp = std::make_unique<PageRegion>(page_size,dam_size);
+        cxl_table = std::make_unique<PageRegion>(page_size,std::numeric_limits<size_t>::max());
+        cxl_temp = std::make_unique<PageRegion>(page_size,std::numeric_limits<size_t>::max());
         // cxl_table = std::make_unique<PageRegion>(page_size,cxl_table_size);
         // cxl_temp = std::make_unique<PageRegion>(page_size,cxl_table_size);
+    }
+    void addDAMTablePage(Addr addr)
+    {
+        dam_table->insert(dam_table->align(addr));
+    }
+    void addCXLTablePage(Addr addr)
+    {
+        cxl_table->insert(dam_table->align(addr));
+    }
+    void addCXLTempPage(Addr addr)
+    {
+        cxl_temp->insert(dam_table->align(addr));
     }
     void warmup(std::unordered_set<uint64_t> *mapped_regions,std::map<uint64_t,std::pair<uint64_t,size_t>> *special_addr_regions)
     {
@@ -153,8 +168,11 @@ class PageManager
         std::stringstream oss;
         oss<<"Page Size: "<<page_size<<" Bytes\n"
            <<"DAM Pages: "<<dam_size<<" Pages\n"
-           <<"DAM Tables: "<<num_mapped_pages<<" Pages\n"
-           <<"DAM temp: "<<dam_temp->getSize()<<" Pages\n";
+           <<"DAM Table added from mapping.dat: "<<num_mapped_pages<<" Pages\n"
+           <<"DAM temp: "<<dam_temp->getSize()<<" Pages\n"
+           <<"DAM Table: "<<dam_table->getSize()<<" Pages\n"
+           <<"CXL temp: "<<cxl_temp->getSize()<<" Pages\n"
+           <<"CXL Table: "<<cxl_table->getSize()<<" Pages\n";
           return oss.str();
     }
 };

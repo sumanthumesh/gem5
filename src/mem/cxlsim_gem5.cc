@@ -278,6 +278,10 @@ CXLSimGem5::recvTimingReq(PacketPtr pkt)
             //This is a non table/temp access, it does not touch any of our special regions
             //Need to check if it will goto DAM or CXL based on whether we have space in DAM
             is_cxl_access = page_mgr->isCXLBound(pkt->req->hasVaddr()?pkt->req->getVaddr():0);
+            if(is_cxl_access)
+            {
+                page_mgr->addCXLTempPage(addr);
+            }
         }
         else 
         {
@@ -292,6 +296,14 @@ CXLSimGem5::recvTimingReq(PacketPtr pkt)
                     is_cxl_access = false;
                     break;
                 }
+            }
+            if(is_cxl_access)
+            {
+                page_mgr->addCXLTablePage(addr);
+            }
+            else
+            {
+                page_mgr->addDAMTablePage(addr);
             }
         }
     }
