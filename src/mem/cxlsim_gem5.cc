@@ -8,6 +8,8 @@
 
 #include "CXLStats.h"
 
+#include <memory>
+
 // spdlog collides with gem5...
 #pragma push_macro("warn")
 #undef warn
@@ -22,6 +24,8 @@ namespace gem5
 namespace memory
 {
 
+
+
 CXLSimGem5::CXLSimGem5(const Params &p) :
     AbstractMemory(p),
     port(name() + ".port", *this),
@@ -30,7 +34,8 @@ CXLSimGem5::CXLSimGem5(const Params &p) :
     nbrOutstandingReads(0), nbrOutstandingWrites(0),
     sendResponseEvent([this]{ sendResponse(); }, name()),
     tickEvent([this]{ tick(); }, name()), record(p.record), num_reads(0), num_writes(0), req_id(0), record_file("record_cxlsim.dat"),
-    cxl_accesses(0), dam_accesses(0), cxl_accesses_roi(0), dam_accesses_roi(0), all_cxl(p.all_cxl), all_dam(p.all_dam)
+    cxl_accesses(0), dam_accesses(0), cxl_accesses_roi(0), dam_accesses_roi(0), all_cxl(p.all_cxl), all_dam(p.all_dam), 
+    page_size(p.page_size), dam_size(p.dam_size)
 {
     DPRINTF(CXLSimGem5, "Instantiated CXLSimGem5 \n");
 
@@ -44,6 +49,8 @@ CXLSimGem5::CXLSimGem5(const Params &p) :
     // Add clocks
     mem_model->add_clk(static_cast<int64_t>(CXL::params.ticks_per_ins));
     mem_model->add_clk(static_cast<int64_t>(CXL::params.ramulator_update_delay_ns));
+
+    page_mgr = std::make_unique<PageManager>(page_size,dam_size);
 
     // Record data written to and read from memory
     if (record)
@@ -66,6 +73,8 @@ CXLSimGem5::CXLSimGem5(const Params &p) :
         std::cout<<"NUM DAM in ROI  : "<<dam_accesses_roi<<"\n";
         std::cout<<"Stats from inside CXLSIM\n";
         std::cout<<CXL::stats.sprint();    
+        //Page Manager
+        std::cout<<page_mgr->print();
         // Close the record file
         if (record)
             record_file_ptr.close();
@@ -92,6 +101,14 @@ CXLSimGem5::init()
     // if (system()->cacheLineSize() != wrapper.burstSize())
     //     fatal("CXLSimGem5 burst size %d does not match cache line size %d\n",
     //           wrapper.burstSize(), system()->cacheLineSize());
+}
+
+void
+CXLSimGem5::warmUp()
+{
+    std::cout<<"CXLSim Warmup"<<std::endl;
+    //This is where we warm up the page table manager
+    page_mgr->warmup(system()->getMappedRegions(),system()->get_special_addr_regions());
 }
 
 void
@@ -230,6 +247,7 @@ CXLSimGem5::recvTimingReq(PacketPtr pkt)
     uint64_t addr = pkt->getAddr(), id = req_id;
     CXL::opcode op = pkt->isRead() ? CXL::opcode::Req : CXL::opcode::RwD;
     //Instantiate is_cxl_access
+    //By default it is not a cxl access
     bool is_cxl_access = false;
     //Variable to store accessed regions
     std::vector<size_t> accessed_regions;
@@ -242,17 +260,38 @@ CXLSimGem5::recvTimingReq(PacketPtr pkt)
     {
         is_cxl_access = true;
     }
+    else if(!system()->isMemRegionROI())
+    {
+        //If we are not in the region of interest, just send everything to DAM, no point in maintaining any sort of page management
+        is_cxl_access = false;
+    }
     else
     {
+        //We are in region of interest
+        //We dont have all_dam or all_cxl set
+
+        //Find if the access touches any of our special address regions
         accessed_regions = find_accessed_region(pkt->req->hasVaddr()?((pkt->req->getVaddr()>>6)<<6):0,pkt->req->getSize());
         auto mapped_regions = system()->getMappedRegions();
-        for (auto &v: accessed_regions)
+        if(accessed_regions.size()==0)
         {
-            if (mapped_regions->find(v) == mapped_regions->end())
-                continue;
-            else {
-                is_cxl_access = true;
-                break;
+            //This is a non table/temp access, it does not touch any of our special regions
+            //Need to check if it will goto DAM or CXL based on whether we have space in DAM
+            is_cxl_access = page_mgr->isCXLBound(pkt->req->hasVaddr()?pkt->req->getVaddr():0);
+        }
+        else 
+        {
+            //This is a table access
+            //Assume it goes to CXL
+            is_cxl_access = true;
+            for (auto &v: accessed_regions)
+            {
+                //If accessed region is mapped to DAM i.e., the region is present in mapped_regions
+                if (mapped_regions->find(v) != mapped_regions->end())
+                {
+                    is_cxl_access = false;
+                    break;
+                }
             }
         }
     }
@@ -362,43 +401,6 @@ CXLSimGem5::recvTimingReq(PacketPtr pkt)
         {
             retryReq = true;
         }
-        
-        // accessAndRespond(pkt);
-        // // Generate ramulator WRITE request and try to send to ramulator's memory system
-        // enqueue_success = mem_model->
-        //     add_external_req(addr, op, id, 
-        //     [this](uint64_t addr) {
-        //         auto& pkt_q = outstandingWrites.find(addr)->second;
-        //         PacketPtr pkt = pkt_q.front();
-        //         DPRINTF(CXLSimGem5, "Write to ID: %lu, Addr: %#lx completed.\n", pkt->id, addr);
-        //         pkt_q.pop_front();
-        //         if (!pkt_q.size())
-        //             outstandingWrites.erase(addr);
-
-        //         // added counter to track requests in flight
-        //         --nbrOutstandingWrites;
-
-        //         accessAndRespond(pkt);
-        //     });
-
-        // if (enqueue_success) 
-        // {
-        //     DPRINTF(CXLSimGem5, "Added write id %lu to mem_model\n", id);
-
-        //     outstandingWrites[pkt->getAddr()].push_back(pkt);
-
-        //     ++nbrOutstandingWrites;
-
-        //     // perform the access for writes
-        //     // accessAndRespond(pkt);
-            
-        //     num_writes++;
-        //     req_id++;
-        // } 
-        // else 
-        // {
-        //     retryReq = true;
-        // }
     } else {
         panic("Shouldnt ever reach here\n");
         // keep it simple and just respond if necessary
@@ -425,18 +427,18 @@ CXLSimGem5::recvTimingReq(PacketPtr pkt)
             else
                 dam_accesses_roi++;
             // find_accessed_region(pkt->req->hasVaddr()?((pkt->req->getVaddr()>>6)<<6):0,pkt->req->getSize());
+            // Increment the per region counts
+            for (auto &r : accessed_regions)
+            {
+                // std::cout<<"INCR"<<std::endl;
+                if (region_access_counts.find(r) == region_access_counts.end())
+                    region_access_counts[r] = 1;
+                else
+                    region_access_counts[r]++;
+            }
+            if (record)
+                record_file_ptr << std::dec << curTick() << " " << std::hex << (pkt->req->hasVaddr() ? pkt->req->getVaddr() : 0) << " " << (pkt->isRead() ? "R" : "W") << std::endl;
         }
-        // Increment the per region counts
-        for (auto &r : accessed_regions)
-        {
-            // std::cout<<"INCR"<<std::endl;
-            if (region_access_counts.find(r) == region_access_counts.end())
-                region_access_counts[r] = 1;
-            else
-                region_access_counts[r]++;
-        }
-        if (record)
-            record_file_ptr << std::dec << curTick() << " " << std::hex << (pkt->req->hasVaddr() ? pkt->req->getVaddr() : 0) << " " << (pkt->isRead() ? "R" : "W") << std::endl;
     }
 
     return enqueue_success;

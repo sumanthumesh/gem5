@@ -16,7 +16,144 @@ namespace gem5
 namespace memory
 {
 
+class PageRegion {
+  private:
+    size_t page_size; // Size of each page in bytes
+    size_t max_size;  // Number of max pages that can be accomodated
+    // Set containing all the unique pages for the region
+    std::unordered_set<uint64_t> page_store;
+  
+  public:
+    PageRegion(size_t page_size, size_t num_max_pages)
+        : page_size(page_size), max_size(num_max_pages) {}
+    /**
+     * Align address to page coundary
+     */
+    uint64_t align(uint64_t addr) {
+      int bits = (int)std::ceil(std::log2(page_size));
+      return (addr >> bits) << bits;
+    }
+    /**
+     * Set/Get max size
+     */
+    void setMaxSize(size_t s) {max_size = s;}
+    size_t getMaxSize() {return max_size;}
+    // Get current size
+    size_t getSize() {return page_store.size();}
+    /**
+     * Try adding a page to this region. Return true if added, false if not
+     */
+    typedef enum InsertStatus {
+      EXISTS,  // The page already exists, don't need to add it
+      SUCCESS, // The page wasn't there before, added it successfully
+      FAILED   // There isn't any more space in the region, cannot add it
+    } InsertStatus;
+    InsertStatus insert(uint64_t addr) {
+      // Align address
+      addr = align(addr);
+      // Check if page exists
+      if (page_store.find(addr) != page_store.end()) {
+        // Page already exists
+        return InsertStatus::EXISTS;
+      } else {
+        // Page does not exist in region
+        // If the page store is full, cannot add anymore
+        if (page_store.size() >= max_size)
+          return InsertStatus::FAILED;
+        else {
+          // Add the page to page_store
+          page_store.insert(addr);
+          return InsertStatus::SUCCESS;
+        }
+      }
+    }
+};
 
+class PageManager
+{
+  private:
+    std::unique_ptr<PageRegion> dam_temp;
+    size_t page_size; //In Bytes
+    size_t dam_size; //In number of pages
+    size_t num_mapped_pages;
+  public:
+    PageManager(size_t page_size,size_t dam_size) : 
+    page_size(page_size), dam_size(dam_size)
+    {
+        // Warmup
+        // dam_table = std::make_unique<PageRegion>(page_size,dam_table_size);
+        dam_temp = std::make_unique<PageRegion>(page_size,dam_size);
+        // cxl_table = std::make_unique<PageRegion>(page_size,cxl_table_size);
+        // cxl_temp = std::make_unique<PageRegion>(page_size,cxl_table_size);
+    }
+    void warmup(std::unordered_set<uint64_t> *mapped_regions,std::map<uint64_t,std::pair<uint64_t,size_t>> *special_addr_regions)
+    {
+        //Calculate the size of the tables mapped to DAM in number of pages
+        num_mapped_pages = 0;
+        //Go through each region, check if it is within the mapped regions, if it is then add its size
+        for(auto &x:*special_addr_regions)
+        {
+            size_t region_id = x.second.second;
+            if(mapped_regions->find(region_id)!=mapped_regions->end())
+            {
+                //It is a mapped region
+                uint64_t num_pages = (uint64_t)std::ceil((x.second.first - x.first)/page_size);
+                num_mapped_pages += num_pages;
+            }
+        }
+        //Reset the dam temp sizes
+        panic_if(dam_size<num_mapped_pages,"DAM size (%lu) is less than number of mapped pages (%lu)",dam_size,num_mapped_pages);
+        dam_temp->setMaxSize(dam_size-num_mapped_pages);
+        //Number of mapped pages 
+        std::cout<<"Added "<<num_mapped_pages<<" DAM table pages"<<std::endl;
+        //Number of mapped pages 
+        std::cout<<"MaxSize of DAM temp table "<<dam_temp->getMaxSize()<<std::endl;
+    }
+    bool isCXLBound(uint64_t addr)
+    {
+        //Return true to say that this access goes to CXL, false means it goes to DAM
+
+        panic_if(dam_temp->getSize()+num_mapped_pages>dam_size,"Exceeded DAM size");
+
+        //For now we only bother about non table pages
+        //So we assume any address reaching here is non table
+        //Check if address already in dam
+        PageRegion::InsertStatus s = dam_temp->insert(addr);
+        switch(s)
+        {
+            case PageRegion::InsertStatus::EXISTS:
+            {
+                //Page already exists in dam. send it there
+                return false;
+            }
+            case PageRegion::InsertStatus::SUCCESS:
+            {
+                //This means page wasn't found in DAM, but was added to it
+                //Direct this access to CXL
+                return false;
+            }
+            case PageRegion::InsertStatus::FAILED:
+            {
+                //The page wasn't found in DAM, and adding it wasn't successful
+                //So this page will be on CXL
+                //Send it there
+                return true;
+            }
+            default:
+              panic("Shouldn't have reached here");
+        }
+    }
+    std::string print()
+    {
+        std::stringstream oss;
+        oss<<"Page Size: "<<page_size<<" Bytes\n"
+           <<"DAM Pages: "<<dam_size<<" Pages\n"
+           <<"DAM Tables: "<<num_mapped_pages<<" Pages\n"
+           <<"DAM temp: "<<dam_temp->getSize()<<" Pages\n";
+          return oss.str();
+    }
+};
+  
 class CXLSimGem5 : public AbstractMemory
 {
   private:
@@ -132,6 +269,13 @@ class CXLSimGem5 : public AbstractMemory
      */
     bool all_dam = false, all_cxl = false;
 
+    /**
+     * Simple greey page manager to divide page allocation between CXL and DAM
+     */
+    std::unique_ptr<PageManager> page_mgr;
+    size_t page_size; //In bytes
+    size_t dam_size; //In number of pages
+
   public:
 
     typedef CXLSimGem5Params Params;
@@ -143,6 +287,7 @@ class CXLSimGem5 : public AbstractMemory
                           PortID idx = InvalidPortID) override;
 
     void init() override;
+    void warmUp() override;
     void startup() override;
 
     void resetStats() override;
