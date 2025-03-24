@@ -105,6 +105,7 @@ class PageManager
     {
         //Calculate the size of the tables mapped to DAM in number of pages
         num_mapped_pages = 0;
+        uint64_t mapped_bytes = 0;
         //Go through each region, check if it is within the mapped regions, if it is then add its size
         for(auto &x:*special_addr_regions)
         {
@@ -112,15 +113,15 @@ class PageManager
             if(mapped_regions->find(region_id)!=mapped_regions->end())
             {
                 //It is a mapped region
-                uint64_t num_pages = (uint64_t)std::ceil((x.second.first - x.first)/(float)page_size);
+                mapped_bytes += (x.second.first - x.first);
                 // std::cout<<"Detected mapped region "<<region_id<<std::endl;
                 // std::cout<<"Num Pages "<<num_pages<<std::endl;
                 // std::cout<<"Page size "<<page_size<<std::endl;
                 // std::cout<<"Start "<<std::hex<<x.first<<std::dec<<std::endl;
                 // std::cout<<"End "<<std::hex<<x.second.first<<std::dec<<std::endl;
-                num_mapped_pages += num_pages;
+              }
             }
-        }
+        num_mapped_pages = std::ceil(mapped_bytes/(float)page_size);
         //Reset the dam temp sizes
         panic_if(dam_size<num_mapped_pages,"DAM size (%lu) is less than number of mapped pages (%lu)",dam_size,num_mapped_pages);
         dam_temp->setMaxSize(dam_size-num_mapped_pages);
