@@ -82,6 +82,18 @@ parser.add_argument(
     help="Set to true if all accesses need to goto CXL",
     action="store_true"
 )
+parser.add_argument(
+    "--page-size",
+    type=int,
+    help="Size of a page in case of CXLSIM in bytes",
+    default=4096
+)
+parser.add_argument(
+    "--dam-size",
+    type=int,
+    help="Size of DAM in case of CXLSIM in number of pages",
+    default=64*1024/4
+)
 
 
 args = parser.parse_args()
@@ -216,8 +228,8 @@ elif args.mem == "cxlsim":
         mem_ctrl.all_cxl = True
     else:
         mem_ctrl.all_cxl = False
-    mem_ctrl.page_size = 4096
-    mem_ctrl.dam_size = 4
+    mem_ctrl.page_size = args.page_size
+    mem_ctrl.dam_size = args.dam_size
     mem_ctrl.skip_cycle = False
     mem_ctrl.record = args.record
     system.mem_ctrl = mem_ctrl
