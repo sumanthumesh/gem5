@@ -392,7 +392,17 @@ class System : public SimObject, public PCEventScope
      * Return a pointer to the device memory.
      */
     memory::AbstractMemory *getDeviceMemory(const PacketPtr& pkt) const;
-
+    /**
+     * Return a pointer to the first memory device
+     */
+    memory::AbstractMemory *getFirstDeviceMemory()
+    {
+        // panic_if(deviceMemMap.size()!=1,"Expected to see only 1 requestor, but found %lu",deviceMemMap.size());
+        // panic_if(deviceMemMap.begin()->second.size()!=1,"Expected to see only 1 requestor, but found %lu",deviceMemMap.begin()->second.size()!=1);
+        // return *deviceMemMap.begin()->second.begin();
+        panic_if(params().memories.size()!=1,"Expected to see only one memory, but found %lu",params().memories.size());
+        return params().memories[0];
+    }
     /**
      * Return a pointer to data structure holding the special address regions indicated by the m5_add_mem_region API
      */
