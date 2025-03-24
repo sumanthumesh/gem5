@@ -18,5 +18,7 @@ class CXLSimGem5(AbstractMemory):
     all_dam = Param.Bool("Whether all accesses should goto DAM")
     all_cxl = Param.Bool("Whether all accesses should goto CXL")
     record = Param.Bool("Set true to record trace")
+    dam_size = Param.Unsigned("Size of the DAM in number of pages")
+    page_size = Param.Unsigned("Size of a page in Bytes")
 
 #   system = Param.System(Parent.any, "System this memory is part of")
