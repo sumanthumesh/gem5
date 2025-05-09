@@ -62,6 +62,7 @@
 #include "dev/net/dist_iface.hh"
 #include "mem/se_translating_port_proxy.hh"
 #include "mem/translating_port_proxy.hh"
+#include "mem/abstract_mem.hh"
 #include "params/BaseCPU.hh"
 #include "sim/full_system.hh"
 #include "sim/process.hh"
@@ -551,6 +552,7 @@ void m5memregioncmd(ThreadContext *tc, size_t n) {
     case 1: // Load from file
     {
         std::ifstream f(dump_file.string());
+        panic_if(!std::filesystem::exists(dump_file),"Did not find %s to read memory regions form",dump_file.string());
 
         std::string line;
 
@@ -573,6 +575,50 @@ void m5memregioncmd(ThreadContext *tc, size_t n) {
         }
 
         std::cout << "Finished loading " << addr_regions->size() << " from file" << std::endl;
+        break;
+    }
+    case 2: //Start region of interest where we track accesses
+    {
+        tc->getSystemPtr()->memRegionROIStart();
+        std::cout<<"Setting MemRegionROI to "<<(tc->getSystemPtr()->isMemRegionROI()?"True":"False")<<std::endl;
+        break;
+    }
+    case 3: //End region of interest where we track accesses
+    {
+        tc->getSystemPtr()->memRegionROIEnd();
+        std::cout<<"Setting MemRegionROI to "<<(tc->getSystemPtr()->isMemRegionROI()?"True":"False")<<std::endl;
+        break;
+    }
+    case 4: // Load mapping
+    {
+        std::filesystem::path map_file = cwd / "mapping.dat";
+
+        // This file contains one int per line where each int is a unique region id
+        // Accesses which touch these regions need to be mapped to CXL
+        // If an access doesn't match any region, it will goto DAM
+        // If an access is mapped to a region that is not present in the mapping.dat file, send it to DAM
+
+        std::ifstream f(map_file.string());
+        panic_if(!std::filesystem::exists(map_file),"Did not find %s to read memory regions form",map_file.string());
+
+        std::string line;
+
+        std::cout << "Loading mapping from " << map_file << std::endl;
+        while (std::getline(f, line)) {
+            // The input will look like
+            // 43
+            // 43 is the region id. Unique to every memory region            
+            size_t region_id = std::stoull(line);
+            // Make sure region id does not exist in mapped regions already
+            panic_if(tc->getSystemPtr()->getMappedRegions()->find(region_id) != tc->getSystemPtr()->getMappedRegions()->end(), "Region %lu already added to map\n", region_id);
+            // Add region id
+            tc->getSystemPtr()->getMappedRegions()->insert(region_id);
+        }
+        std::cout << "Finished loading " << tc->getSystemPtr()->getMappedRegions()->size() << " from "<< map_file << std::endl;
+
+        //Call the memory's warmup function
+        tc->getSystemPtr()->getFirstDeviceMemory()->warmUp();
+        
         break;
     }
     default: {

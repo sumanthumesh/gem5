@@ -51,6 +51,7 @@
 #include <cassert>
 #include <initializer_list>
 #include <list>
+#include <iomanip>
 
 #include "base/addr_range.hh"
 #include "base/cast.hh"
@@ -375,6 +376,9 @@ class Packet : public Printable, public Extensible<Packet>
 
     /// A pointer to the original request.
     RequestPtr req;
+
+    // Is it a prefetch issued by LLC
+    bool is_llc_prefetch = false;
 
   private:
    /**
@@ -805,6 +809,7 @@ class Packet : public Printable, public Extensible<Packet>
     void copyError(Packet *pkt) { assert(pkt->isError()); cmd = pkt->cmd; }
 
     Addr getAddr() const { assert(flags.isSet(VALID_ADDR)); return addr; }
+    bool isValidAddr() const { return flags.isSet(VALID_ADDR);}
     /**
      * Update the address of this packet mid-transaction. This is used
      * by the address mapper to change an already set address to a new
@@ -1334,6 +1339,22 @@ class Packet : public Printable, public Extensible<Packet>
                 // Disabled bytes stay untouched
             }
         }
+    }
+
+    /**
+     * Write the data that is stored in the packet into a string that can be printed
+     */
+    std::string sprintData() const {
+
+        std::stringstream ss;
+
+        for (size_t i = 0; i < size; ++i) {
+            // Output each byte in hexadecimal, ensuring two digits with leading zero if needed
+            ss << std::hex << std::setw(2) << std::setfill('0') << (int)(getConstPtr<uint8_t>()[i]);
+        }
+
+        return ss.str();
+
     }
 
     /**

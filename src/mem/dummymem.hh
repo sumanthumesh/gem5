@@ -1,19 +1,13 @@
-#ifndef __MEM_RAMULATOR2_HH__
-#define __MEM_RAMULATOR2_HH__
+#ifndef __MEM_DUMMYMEM_HH__
+#define __MEM_DUMMYMEM_HH__
 
 #include <functional>
 #include <deque>
 #include <unordered_map>
 
 #include "mem/abstract_mem.hh"
-#include "params/Ramulator2.hh"
+#include "params/DummyMem.hh"
 
-// Forward declare Ramulator2 top-level components
-namespace Ramulator
-{
-  class IFrontEnd;
-  class IMemorySystem;
-}
 
 
 namespace gem5
@@ -23,57 +17,43 @@ namespace memory
 {
 
 
-class Ramulator2 : public AbstractMemory
+class DummyMem : public AbstractMemory
 {
   private:
     class MemorySystemPort : public ResponsePort
     {
 
       private:
-        Ramulator2& ramulator2;
+        DummyMem& smem;
 
       public:
-        MemorySystemPort(const std::string& _name, Ramulator2& _ramulator2);
+        MemorySystemPort(const std::string& _name, DummyMem& _mem);
 
       protected:
-        Tick recvAtomic(PacketPtr pkt) override { return ramulator2.recvAtomic(pkt); };
-        void recvFunctional(PacketPtr pkt) override { ramulator2.recvFunctional(pkt); };
-        bool recvTimingReq(PacketPtr pkt) override { return ramulator2.recvTimingReq(pkt); };
-        void recvRespRetry() override { ramulator2.recvRespRetry(); };
+        Tick recvAtomic(PacketPtr pkt) override { return smem.recvAtomic(pkt); };
+        void recvFunctional(PacketPtr pkt) override { smem.recvFunctional(pkt); };
+        bool recvTimingReq(PacketPtr pkt) override { return smem.recvTimingReq(pkt); };
+        void recvRespRetry() override { smem.recvRespRetry(); };
 
         AddrRangeList getAddrRanges() const override
         {
           AddrRangeList ranges;
-          ranges.push_back(ramulator2.getAddrRange());
+          // ranges.push_back(ramulator2.getAddrRange());
+          ranges.push_back(smem.getAddrRange());
           return ranges;
         };
     };
 
     MemorySystemPort port;
 
-    std::string config_path;
-    Ramulator::IFrontEnd* ramulator2_frontend;
-    Ramulator::IMemorySystem* ramulator2_memorysystem;
-
-    // std::function<void(Ramulator::Request&)> read_callback;
-    // std::function<void(Ramulator::Request&)> write_callback;
     bool retryReq;
     bool retryResp;
-    Tick startTick;
     std::unordered_map<Addr, std::deque<PacketPtr>> outstandingReads;
     std::unordered_map<Addr, std::deque<PacketPtr>> outstandingWrites;
 
     /**
-     * Count the number of outstanding transactions so that we can
-     * block any further requests until there is space in Ramulator2 and
-     * the sending queue we need to buffer the response packets.
-     */
-    unsigned int nbrOutstandingReads;
-    unsigned int nbrOutstandingWrites;
-
-    /**
      * Queue to hold response packets until we can send them
-     * back. This is needed as Ramulator2 unconditionally passes
+     * back. This is needed as DummyMem unconditionally passes
      * responses back without any flow control.
      */
     std::deque<PacketPtr> responseQueue;
@@ -98,24 +78,15 @@ class Ramulator2 : public AbstractMemory
     EventFunctionWrapper sendResponseEvent;
 
     /**
-     * Progress the controller one clock cycle.
-     */
-    void tick();
-
-    /**
-     * Event to schedule clock ticks
-     */
-    EventFunctionWrapper tickEvent;
-
-    /**
      * Upstream caches need this packet until true is returned, so
      * hold it for deletion until a subsequent call
      */
     std::unique_ptr<Packet> pendingDelete;
 
-    //Store number of reads and writes for reference
-    uint64_t num_reads = 0;
-    uint64_t num_writes = 0;
+    /**
+     * Unique ID to keep track of requests
+     */
+    uint64_t req_id = 0;
 
     /**
      * Bool telling us whether to record data from reads or writes
@@ -125,13 +96,15 @@ class Ramulator2 : public AbstractMemory
     std::string record_file;
     std::ofstream record_file_ptr;
 
-    // Req id
-    uint64_t req_id;
+    /**
+     * Counters to count number of reads and writes
+     */
+    uint64_t num_reads, num_writes;
 
   public:
 
-    typedef Ramulator2Params Params;
-    Ramulator2(const Params &p);
+    typedef DummyMemParams Params;
+    DummyMem(const Params &p);
 
     DrainState drain() override;
 
@@ -155,4 +128,4 @@ class Ramulator2 : public AbstractMemory
 } // namespace memory
 } // namespace gem5
 
-#endif // __MEM_RAMULATOR2_HH__
+#endif // __MEM_DUMMYMEM_HH__

@@ -29,15 +29,20 @@ Ramulator2::Ramulator2(const Params &p) :
     retryReq(false), retryResp(false), startTick(0),
     nbrOutstandingReads(0), nbrOutstandingWrites(0),
     sendResponseEvent([this]{ sendResponse(); }, name()),
-    tickEvent([this]{ tick(); }, name())
+    tickEvent([this]{ tick(); }, name()), record(p.record), req_id(0), record_file("record_ramulator2.dat")
 {
     DPRINTF(Ramulator2, "Instantiated Ramulator2 \n");
 
+    // Record data written to and read from memory
+    if (record)
+        record_file_ptr.open(record_file);
+
     registerExitCallback([this]() { 
-        std::cout<<"NUM READS: "<<num_reads<<"\n";
+        std::cout<<"NUM READS : "<<num_reads<<"\n";
         std::cout<<"NUM WRITES: "<<num_writes<<"\n";
         ramulator2_frontend->finalize();
         ramulator2_memorysystem->finalize();
+        panic_if(nbrOutstanding()!=0, "All requests haven't been fulfilled\n");
     });
 }
 
@@ -158,8 +163,8 @@ Ramulator2::recvFunctional(PacketPtr pkt)
 bool
 Ramulator2::recvTimingReq(PacketPtr pkt)
 {
-    DPRINTF(Ramulator2, "recvTimingReq: request %s addr %#x size %d\n",
-            pkt->cmdString(), pkt->getAddr(), pkt->getSize());
+    DPRINTF(Ramulator2, "recvTimingReq: request %s addr %#x size %d id %lu\n",
+            pkt->cmdString(), pkt->getAddr(), pkt->getSize(),pkt->id);
 
     panic_if(pkt->cacheResponding(), "Should not see packets where cache "
              "is responding");
@@ -245,6 +250,15 @@ Ramulator2::recvTimingReq(PacketPtr pkt)
         accessAndRespond(pkt);
         return true;
     }
+    if (enqueue_success && record)
+    {
+        record_file_ptr<<"E,"<<std::dec<<req_id<<","<<std::hex<<pkt->getAddr()<<","<<(pkt->isRead()?"R":"W")<<"\n";
+    }
+    if (enqueue_success)
+    {
+        req_id++;
+    }
+
 
     return enqueue_success;
 }
@@ -267,6 +281,11 @@ Ramulator2::accessAndRespond(PacketPtr pkt)
     bool needsResponse = pkt->needsResponse();
 
     access(pkt);
+
+    // if(record)
+    // {
+    //     record_file_ptr<<pkt->getAddr()<<","<<pkt->sprintData()<<"\n";
+    // }
 
     // turn packet around to go back to requestor if response expected
     if (needsResponse) {

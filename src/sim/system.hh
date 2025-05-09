@@ -333,6 +333,17 @@ class System : public SimObject, public PCEventScope
 
     std::map<uint64_t, std::pair<uint64_t, size_t>> addr_regions;
 
+    /**
+     * This flag marks region of interest within which we monitor memory accesses
+     * It is set/reset through the m5_memory_region_cmd API from the workload source
+     */
+    bool monitor_special_mem_regions = false;
+
+    /**
+     * This set holds all region ids which have been read from mapping file
+     */
+    std::unordered_set<size_t> mapped_regions;
+
   public:
     /**
      * Get a pointer to the Kernel Virtual Machine (KVM) SimObject,
@@ -381,11 +392,32 @@ class System : public SimObject, public PCEventScope
      * Return a pointer to the device memory.
      */
     memory::AbstractMemory *getDeviceMemory(const PacketPtr& pkt) const;
-
+    /**
+     * Return a pointer to the first memory device
+     */
+    memory::AbstractMemory *getFirstDeviceMemory()
+    {
+        // panic_if(deviceMemMap.size()!=1,"Expected to see only 1 requestor, but found %lu",deviceMemMap.size());
+        // panic_if(deviceMemMap.begin()->second.size()!=1,"Expected to see only 1 requestor, but found %lu",deviceMemMap.begin()->second.size()!=1);
+        // return *deviceMemMap.begin()->second.begin();
+        panic_if(params().memories.size()!=1,"Expected to see only one memory, but found %lu",params().memories.size());
+        return params().memories[0];
+    }
     /**
      * Return a pointer to data structure holding the special address regions indicated by the m5_add_mem_region API
      */
     std::map<uint64_t,std::pair<uint64_t,size_t>> *get_special_addr_regions() {return &addr_regions;}
+    /**
+     * Set the monitor_special_addr_regions flags
+     */
+    void memRegionROIStart() {monitor_special_mem_regions = true;}
+    void memRegionROIEnd() {monitor_special_mem_regions = false;}
+    bool isMemRegionROI() {return monitor_special_mem_regions;}
+    /**
+     * Return pointer to set which has the mapped memory regions
+     */
+    std::unordered_set<size_t>* getMappedRegions() {return &mapped_regions;}
+
 
     /*
      * Return the list of address ranges backed by a shadowed ROM.

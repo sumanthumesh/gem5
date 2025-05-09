@@ -231,6 +231,8 @@ class AbstractMemory : public ClockedObject
 
     void initState() override;
 
+    virtual void warmUp() {}
+
     /**
      * See if this is a null memory that should never store data and
      * always return zero.
@@ -362,6 +364,18 @@ class AbstractMemory : public ClockedObject
      * @param pkt Packet performing the access
      */
     void functionalAccess(PacketPtr pkt);
+
+    /**
+     * This function is used to find if the current virtual address has a match in the 
+     * special address regions. The function returns a vector of all the address regions
+     * touched by this access
+     */
+    std::vector<size_t> find_accessed_region(Addr addr, unsigned size);
+
+    /**
+     * Keep count of accesses to each address region
+     */
+    std::unordered_map<size_t, uint64_t> region_access_counts;
 };
 
 } // namespace memory

@@ -45,3 +45,4 @@ class L3Cache(Cache):
         self.response_latency = 30
         self.mshrs = 32
         self.tgts_per_mshr = 12
+        self.is_llc = True

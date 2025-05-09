@@ -1,70 +1,228 @@
 #ifndef __MEM_CXLSIMGEM5_HH__
 #define __MEM_CXLSIMGEM5_HH__
 
-#include <deque>
 #include <functional>
+#include <deque>
 #include <unordered_map>
 
-#include "cxlsim/cxlsim/include/CXLWrapper.h"
+#include "cxlsim/include/CXLWrapper.h"
+
 #include "mem/abstract_mem.hh"
 #include "params/CXLSimGem5.hh"
+#include <limits>
 
-// Forward declare SimpleMem
-// namespace simple_mem {
+namespace gem5
+{
 
-// class SimpleMem;
-// class Req;
-// class OpType;
+namespace memory
+{
 
-// }
-
-namespace gem5 {
-
-namespace memory {
-
-class CXLSimGem5 : public AbstractMemory {
+class PageRegion {
   private:
-    class MemorySystemPort : public ResponsePort {
+    size_t page_size; // Size of each page in bytes
+    size_t max_size;  // Number of max pages that can be accomodated
+    // Set containing all the unique pages for the region
+    std::unordered_set<uint64_t> page_store;
+  
+  public:
+    PageRegion(size_t page_size, size_t num_max_pages)
+        : page_size(page_size), max_size(num_max_pages) {}
+    /**
+     * Align address to page coundary
+     */
+    uint64_t align(uint64_t addr) {
+      int bits = (int)std::ceil(std::log2(page_size));
+      return (addr >> bits) << bits;
+    }
+    /**
+     * Set/Get max size
+     */
+    void setMaxSize(size_t s) {max_size = s;}
+    size_t getMaxSize() {return max_size;}
+    // Get current size
+    size_t getSize() {return page_store.size();}
+    /**
+     * Try adding a page to this region. Return true if added, false if not
+     */
+    typedef enum InsertStatus {
+      EXISTS,  // The page already exists, don't need to add it
+      SUCCESS, // The page wasn't there before, added it successfully
+      FAILED   // There isn't any more space in the region, cannot add it
+    } InsertStatus;
+    InsertStatus insert(uint64_t addr) {
+      // Align address
+      addr = align(addr);
+      // Check if page exists
+      if (page_store.find(addr) != page_store.end()) {
+        // Page already exists
+        return InsertStatus::EXISTS;
+      } else {
+        // Page does not exist in region
+        // If the page store is full, cannot add anymore
+        if (page_store.size() >= max_size)
+          return InsertStatus::FAILED;
+        else {
+          // Add the page to page_store
+          page_store.insert(addr);
+          return InsertStatus::SUCCESS;
+        }
+      }
+    }
+};
+
+class PageManager
+{
+  private:
+    std::unique_ptr<PageRegion> dam_temp,dam_table,cxl_table,cxl_temp;
+    size_t page_size; //In Bytes
+    size_t dam_size; //In number of pages
+    size_t num_mapped_pages;
+  public:
+    PageManager(size_t page_size,size_t dam_size) : 
+    page_size(page_size), dam_size(dam_size)
+    {
+        // Warmup
+        dam_table = std::make_unique<PageRegion>(page_size,std::numeric_limits<size_t>::max());
+        dam_temp = std::make_unique<PageRegion>(page_size,dam_size);
+        cxl_table = std::make_unique<PageRegion>(page_size,std::numeric_limits<size_t>::max());
+        cxl_temp = std::make_unique<PageRegion>(page_size,std::numeric_limits<size_t>::max());
+        // cxl_table = std::make_unique<PageRegion>(page_size,cxl_table_size);
+        // cxl_temp = std::make_unique<PageRegion>(page_size,cxl_table_size);
+    }
+    void addDAMTablePage(Addr addr)
+    {
+        dam_table->insert(dam_table->align(addr));
+    }
+    void addCXLTablePage(Addr addr)
+    {
+        cxl_table->insert(dam_table->align(addr));
+    }
+    void addCXLTempPage(Addr addr)
+    {
+        cxl_temp->insert(dam_table->align(addr));
+    }
+    void warmup(std::unordered_set<uint64_t> *mapped_regions,std::map<uint64_t,std::pair<uint64_t,size_t>> *special_addr_regions)
+    {
+        //Calculate the size of the tables mapped to DAM in number of pages
+        num_mapped_pages = 0;
+        uint64_t mapped_bytes = 0;
+        //Go through each region, check if it is within the mapped regions, if it is then add its size
+        for(auto &x:*special_addr_regions)
+        {
+            size_t region_id = x.second.second;
+            if(mapped_regions->find(region_id)!=mapped_regions->end())
+            {
+                //It is a mapped region
+                mapped_bytes += (x.second.first - x.first);
+                // std::cout<<"Detected mapped region "<<region_id<<std::endl;
+                // std::cout<<"Num Pages "<<num_pages<<std::endl;
+                // std::cout<<"Page size "<<page_size<<std::endl;
+                // std::cout<<"Start "<<std::hex<<x.first<<std::dec<<std::endl;
+                // std::cout<<"End "<<std::hex<<x.second.first<<std::dec<<std::endl;
+              }
+            }
+        num_mapped_pages = std::ceil(mapped_bytes/(float)page_size);
+        //Reset the dam temp sizes
+        panic_if(dam_size<num_mapped_pages,"DAM size (%lu) is less than number of mapped pages (%lu)",dam_size,num_mapped_pages);
+        dam_temp->setMaxSize(dam_size-num_mapped_pages);
+        //Number of mapped pages 
+        std::cout<<"Added "<<num_mapped_pages<<" DAM table pages"<<std::endl;
+        //Number of mapped pages 
+        std::cout<<"MaxSize of DAM temp table "<<dam_temp->getMaxSize()<<std::endl;
+    }
+    bool isCXLBound(uint64_t addr)
+    {
+        //Return true to say that this access goes to CXL, false means it goes to DAM
+
+        panic_if(dam_temp->getSize()+num_mapped_pages>dam_size,"Exceeded DAM size");
+
+        //For now we only bother about non table pages
+        //So we assume any address reaching here is non table
+        //Check if address already in dam
+        PageRegion::InsertStatus s = dam_temp->insert(addr);
+        switch(s)
+        {
+            case PageRegion::InsertStatus::EXISTS:
+            {
+                //Page already exists in dam. send it there
+                return false;
+            }
+            case PageRegion::InsertStatus::SUCCESS:
+            {
+                //This means page wasn't found in DAM, but was added to it
+                //Direct this access to CXL
+                return false;
+            }
+            case PageRegion::InsertStatus::FAILED:
+            {
+                //The page wasn't found in DAM, and adding it wasn't successful
+                //So this page will be on CXL
+                //Send it there
+                return true;
+            }
+            default:
+              panic("Shouldn't have reached here");
+        }
+    }
+    std::string print()
+    {
+        std::stringstream oss;
+        oss<<"Page Size: "<<page_size<<" Bytes\n"
+           <<"DAM Pages: "<<dam_size<<" Pages\n"
+           <<"DAM Table added from mapping.dat: "<<num_mapped_pages<<" Pages\n"
+           <<"DAM temp: "<<dam_temp->getSize()<<" Pages\n"
+           <<"DAM Table: "<<dam_table->getSize()<<" Pages\n"
+           <<"CXL temp: "<<cxl_temp->getSize()<<" Pages\n"
+           <<"CXL Table: "<<cxl_table->getSize()<<" Pages\n";
+          return oss.str();
+    }
+};
+  
+class CXLSimGem5 : public AbstractMemory
+{
+  private:
+    class MemorySystemPort : public ResponsePort
+    {
 
       private:
-        CXLSimGem5 &mem;
+        CXLSimGem5& cxl_mem;
 
       public:
-        MemorySystemPort(const std::string &_name, CXLSimGem5 &mem);
+        MemorySystemPort(const std::string& _name, CXLSimGem5& _cxl_mem);
 
       protected:
-        Tick recvAtomic(PacketPtr pkt) override { return mem.recvAtomic(pkt); };
-        void recvFunctional(PacketPtr pkt) override { mem.recvFunctional(pkt); };
-        bool recvTimingReq(PacketPtr pkt) override { return mem.recvTimingReq(pkt); };
-        void recvRespRetry() override { mem.recvRespRetry(); };
+        Tick recvAtomic(PacketPtr pkt) override { return cxl_mem.recvAtomic(pkt); };
+        void recvFunctional(PacketPtr pkt) override { cxl_mem.recvFunctional(pkt); };
+        bool recvTimingReq(PacketPtr pkt) override { return cxl_mem.recvTimingReq(pkt); };
+        void recvRespRetry() override { cxl_mem.recvRespRetry(); };
 
-        AddrRangeList getAddrRanges() const override {
-            AddrRangeList ranges;
-            ranges.push_back(mem.getAddrRange());
-            return ranges;
+        AddrRangeList getAddrRanges() const override
+        {
+          AddrRangeList ranges;
+          ranges.push_back(cxl_mem.getAddrRange());
+          return ranges;
         };
     };
 
     MemorySystemPort port;
 
     std::string config_path;
-    CXL::CXLWrapper smem;
 
-    // std::function<void(Ramulator::Request&)> read_callback;
-    // std::function<void(Ramulator::Request&)> write_callback;
+    // Actual memory model
+    std::unique_ptr<CXL::CXLWrapper> mem_model;
+
+    std::function<void(uint64_t req_id)> read_callback;
+    std::function<void(uint64_t req_id)> write_callback;
     bool retryReq;
     bool retryResp;
     Tick startTick;
     std::unordered_map<Addr, std::deque<PacketPtr>> outstandingReads;
     std::unordered_map<Addr, std::deque<PacketPtr>> outstandingWrites;
-    // Simple maps to hold outstanding requests as a req_id:pktptr pair
-    //  std::unordered_map<uint64_t,PacketPtr> pending_reads;
-    //  std::unordered_map<uint64_t,PacketPtr> pending_writes;
-    std::unordered_map<Addr, PacketPtr> pending_requests;
+    std::unordered_map<uint64_t, PacketPtr> pendingRequests;
 
     /**
      * Count the number of outstanding transactions so that we can
-     * block any further requests until there is space in Ramulator2 and
+     * block any further requests until there is space in CXLSimGem5 and
      * the sending queue we need to buffer the response packets.
      */
     unsigned int nbrOutstandingReads;
@@ -72,10 +230,11 @@ class CXLSimGem5 : public AbstractMemory {
 
     /**
      * Queue to hold response packets until we can send them
-     * back. This is needed as Ramulator2 unconditionally passes
+     * back. This is needed as CXLSimGem5 unconditionally passes
      * responses back without any flow control.
      */
     std::deque<PacketPtr> responseQueue;
+
 
     unsigned int nbrOutstanding() const;
 
@@ -99,16 +258,11 @@ class CXLSimGem5 : public AbstractMemory {
      * Progress the controller one clock cycle.
      */
     void tick();
-    void ramtick();
 
     /**
      * Event to schedule clock ticks
      */
     EventFunctionWrapper tickEvent;
-    /**
-     * Event to schedule ramulator ticks
-     */
-    EventFunctionWrapper ramulatorEvent;
 
     /**
      * Upstream caches need this packet until true is returned, so
@@ -116,45 +270,59 @@ class CXLSimGem5 : public AbstractMemory {
      */
     std::unique_ptr<Packet> pendingDelete;
 
-    // To hold request ID
-    uint64_t req_id;
+    /**
+     * Bool telling us whether to record data from reads or writes
+     * Also the filename where to write these values
+     */
+    bool record;
+    std::string record_file;
+    std::ofstream record_file_ptr;
 
     /**
-     * List of special address regions
+     * Counters to count number of reads and writes
      */
-    std::map<uint64_t, std::pair<uint64_t, size_t>> *addr_regions;
+    uint64_t num_reads, num_writes;
+    uint64_t cxl_accesses, dam_accesses;
+    uint64_t cxl_accesses_roi, dam_accesses_roi;
+    /**
+     * Custom req id counter
+     */
+    uint64_t req_id;
+    /**
+     * Flags to set if we want all accesses to goto DAM or if all accesses should goto CXL
+     */
+    bool all_dam = false, all_cxl = false;
 
-    // Number of accesses to said regions
-    std::map<size_t, size_t> region_counts;
-
-    // Counter to track inactive cycles in cxlsim
-    uint64_t inactive_cycle_count;
-    // Total cycles CXLSim
-    uint64_t total_cycle_count;
-    // Flag that tells us if we should be skipping cycles or not
-    bool skip_cycle;
+    /**
+     * Simple greey page manager to divide page allocation between CXL and DAM
+     */
+    std::unique_ptr<PageManager> page_mgr;
+    size_t page_size; //In bytes
+    size_t dam_size; //In number of pages
 
   public:
-    PARAMS(CXLSimGem5);
-    // typedef CXLSimGem5Params Params;
+
+    typedef CXLSimGem5Params Params;
     CXLSimGem5(const Params &p);
 
     DrainState drain() override;
 
-    virtual Port &getPort(const std::string &if_name, PortID idx = InvalidPortID) override;
+    virtual Port& getPort(const std::string& if_name,
+                          PortID idx = InvalidPortID) override;
 
     void init() override;
+    void warmUp() override;
     void startup() override;
 
     void resetStats() override;
 
   protected:
+
     Tick recvAtomic(PacketPtr pkt);
     void recvFunctional(PacketPtr pkt);
     bool recvTimingReq(PacketPtr pkt);
     void recvRespRetry();
 
-    std::vector<size_t> find_special_addr_region(uint64_t addr, size_t size);
 };
 
 } // namespace memory

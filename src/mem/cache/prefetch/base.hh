@@ -103,6 +103,8 @@ class Base : public ClockedObject
 
   public:
 
+    bool is_llc_prefetcher;
+
     /**
      * Class containing the information needed by the prefetch to train and
      * generate new prefetch requests.

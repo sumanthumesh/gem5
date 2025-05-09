@@ -4,7 +4,7 @@ SHARED_FLAGS := -fPIC -shared
 
 SOURCE_BASE := m5op
 
-INCLUDE_DIR := /data1/sumanthu/gem5/include
+INCLUDE_DIR := /data2/sumanthu/gem5/include
 
 TARGET :
 	$(CC) -o lib$(SOURCE_BASE).so $(CXX_FLAGS) $(SHARED_FLAGS) $(SOURCE_BASE).S -I$(INCLUDE_DIR)

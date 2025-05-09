@@ -36,8 +36,63 @@ parser.add_argument(
 )
 parser.add_argument(
     "--mem",
-    help="Memory type: ramulator2, simplemem, atomicmem, cxlsim",
-    default="atomicmem"
+    help="Memory type: ramulator2, simplemem, atomicmem, cxlsim, dummymem",
+    default="atomicmem",
+)
+parser.add_argument(
+    "--record",
+    help="Set to true if mem accesses need to be recorded",
+    action="store_true",
+    default=False
+)
+parser.add_argument(
+    "--cpu",
+    help="CPU type: timing, O3, atomic",
+    default="O3",
+)
+parser.add_argument(
+    "--mem-mode",
+    help="Memory mode: timing, atomic",
+    default="timing",
+)
+parser.add_argument(
+    "--repeat-checkpoint",
+    type=int,
+    help="Repeatedly take checkpoint after these many instructions",
+    default=None,
+)
+parser.add_argument(
+    "--bus-width",
+    type=int,
+    help="Specify the system bus width",
+    default=128,
+)
+parser.add_argument(
+    "--cxlsim-config",
+    help="Config file for cxlsim",
+    default=None
+)
+parser.add_argument(
+    "--all-dam",
+    help="Set to true if all accesses need to goto DAM",
+    action="store_true"
+)
+parser.add_argument(
+    "--all-cxl",
+    help="Set to true if all accesses need to goto CXL",
+    action="store_true"
+)
+parser.add_argument(
+    "--page-size",
+    type=int,
+    help="Size of a page in case of CXLSIM in bytes",
+    default=4096
+)
+parser.add_argument(
+    "--dam-size",
+    type=int,
+    help="Size of DAM in case of CXLSIM in number of pages",
+    default=64*1024/4
 )
 
 
@@ -66,24 +121,34 @@ system.clk_domain.voltage_domain = VoltageDomain()
 if args.checkpoint_dir:
     system.mem_mode = "atomic"
 else:
-    system.mem_mode = "timing"
+    system.mem_mode = args.mem_mode
 system.mem_ranges = [AddrRange("8GB")]
 
 # Memory bus
 system.membus = SystemXBar()
+if args.bus_width != None:
+    system.membus.width = args.bus_width
+
 
 # Create CPUs
 if args.checkpoint_dir:
     system.cpus = [AtomicSimpleCPU(cpu_id=i) for i in range(NUM_CORES)]
 else:
-    system.cpus = [DerivO3CPU(cpu_id=i) for i in range(NUM_CORES)]
+    if args.cpu == "timing":
+        system.cpus = [TimingSimpleCPU(cpu_id=i) for i in range(NUM_CORES)]
+    elif args.cpu == "O3":
+        system.cpus = [DerivO3CPU(cpu_id=i) for i in range(NUM_CORES)]
+    elif args.cpu == "atomic":
+        system.cpus = [AtomicSimpleCPU(cpu_id=i) for i in range(NUM_CORES)]
 # system.cpus = [TimingSimpleCPU(cpu_id=i) for i in range(NUM_CORES)]
 
 if not args.no_cache:
     # system.l3cache = L3Cache(size="8MB", assoc=16)  # Shared L3 cache
-    system.l3cache = L3Cache(size="16kB", assoc=16)  # Shared L3 cache
+    system.l3cache = L3Cache(size=f"2MB", assoc=16)  # Shared L3 cache
 
     system.l2_to_l3bus = SystemXBar()
+    if args.bus_width != None:
+        system.l2_to_l3bus.width = args.bus_width
 
 for cpu in system.cpus:
     # Interrupt stuff
@@ -96,8 +161,8 @@ for cpu in system.cpus:
         # Create L1 caches (private to each core)
         # cpu.icache = L1ICache(size="1kB", assoc=4)
         # cpu.dcache = L1DCache(size="32kB", assoc=4)
-        cpu.icache = L1ICache(size="1kB", assoc=4)
-        cpu.dcache = L1DCache(size="1kB", assoc=4)
+        cpu.icache = L1ICache(size="32kB", assoc=4)
+        cpu.dcache = L1DCache(size="32kB", assoc=4)
 
         # Connect CPU to L1
         cpu.icache_port = cpu.icache.cpu_side
@@ -105,10 +170,12 @@ for cpu in system.cpus:
 
         # Create L2
         # cpu.l2cache = L2Cache(size="256kB", assoc=8)
-        cpu.l2cache = L2Cache(size="8kB", assoc=8)
+        cpu.l2cache = L2Cache(size="256kB", assoc=8)
 
         # Create bus from L1 to L2
         cpu.l1_to_l2bus = L2XBar()
+        if args.bus_width != None:
+            cpu.l1_to_l2bus.width = args.bus_width
 
         # Connect L1 to bus
         cpu.icache.mem_side = cpu.l1_to_l2bus.cpu_side_ports
@@ -130,29 +197,56 @@ if not args.no_cache:
     # Connect L3 to system bus
     system.l3cache.mem_side = system.membus.cpu_side_ports
 
-if (args.checkpoint_dir and not args.no_cache) or args.mem=="atomicmem":
+if (args.checkpoint_dir and not args.no_cache) or args.mem == "atomicmem":
     system.mem_ctrl = MemCtrl()
     system.mem_ctrl.dram = DDR3_1600_8x8()
     system.mem_ctrl.dram.range = system.mem_ranges[0]
     system.mem_ctrl.port = system.membus.mem_side_ports
-elif args.mem=="simplemem":
+elif args.mem == "simplemem":
     mem_ctrl = SimpleGem5Mem()
     mem_ctrl.range = system.mem_ranges[0]
     mem_ctrl.tck = 1 / 1.6
     mem_ctrl.port = system.membus.mem_side_ports
+    mem_ctrl.record = args.record
     system.mem_ctrl = mem_ctrl
-elif args.mem=="cxlsim":
+elif args.mem == "cxlsim":
     mem_ctrl = CXLSimGem5()
     mem_ctrl.range = system.mem_ranges[0]
     mem_ctrl.tck = 1 / 1.6
     mem_ctrl.port = system.membus.mem_side_ports
-    mem_ctrl.config_path = "/data1/sumanthu/gem5/ext/cxlsim/cxlsim/ramulator/configs/DDR4-config.cfg"
-    mem_ctrl.skip_cycle = True
+    if args.cxlsim_config == None:
+        print(f"CXLSIM config not specified")
+        exit(2)
+    else:
+        mem_ctrl.config_path = os.path.abspath(args.cxlsim_config)
+        print(f"Using {args.cxlsim_config}")
+    if args.all_dam:
+        mem_ctrl.all_dam = True
+    else:
+        mem_ctrl.all_dam = False
+    if args.all_cxl:
+        mem_ctrl.all_cxl = True
+    else:
+        mem_ctrl.all_cxl = False
+    mem_ctrl.page_size = args.page_size
+    mem_ctrl.dam_size = args.dam_size
+    mem_ctrl.skip_cycle = False
+    mem_ctrl.record = args.record
     system.mem_ctrl = mem_ctrl
-elif args.mem=="ramulator2":
+elif args.mem == "ramulator2":
     mem_ctrl = Ramulator2()
-    mem_ctrl.config_path = './ext/ramulator2/ramulator2/example_config.yaml'
+    mem_ctrl.config_path = "/data2/sumanthu/gem5/ext/ramulator2/ramulator2/example_config.yaml"
     mem_ctrl.range = system.mem_ranges[0]
+    mem_ctrl.port = system.membus.mem_side_ports
+    mem_ctrl.record = args.record
+    system.mem_ctrl = mem_ctrl
+elif args.mem == "dummymem":
+    #Make sure memory mode is atomic
+    assert args.mem_mode == "timing", f"DummyMem only supports timing mode, not {args.mem_mode}"
+    assert args.cpu != "atomic", f"DummyMem only supports timing/O3 cpu, not {args.cpu}"
+    mem_ctrl = DummyMem()
+    mem_ctrl.range = system.mem_ranges[0]
+    mem_ctrl.record = args.record
     mem_ctrl.port = system.membus.mem_side_ports
     system.mem_ctrl = mem_ctrl
 else:
