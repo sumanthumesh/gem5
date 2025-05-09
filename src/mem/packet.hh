@@ -377,6 +377,9 @@ class Packet : public Printable, public Extensible<Packet>
     /// A pointer to the original request.
     RequestPtr req;
 
+    // Is it a prefetch issued by LLC
+    bool is_llc_prefetch = false;
+
   private:
    /**
     * A pointer to the data being transferred. It can be different

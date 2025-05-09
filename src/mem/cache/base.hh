@@ -407,6 +407,9 @@ class BaseCache : public ClockedObject
      */
     std::unique_ptr<Packet> pendingDelete;
 
+    /* Flag to identify LLC */
+    bool is_llc;
+
     /**
      * Mark a request as in service (sent downstream in the memory
      * system), effectively making this MSHR the ordering point.
@@ -1233,6 +1236,11 @@ class BaseCache : public ClockedObject
     {
         return blocked != 0;
     }
+
+    /**
+     * Returns true if the cache is LLC
+     */
+    bool isLLC() {return is_llc;}
 
     /**
      * Marks the access path of the cache as blocked for the given cause. This

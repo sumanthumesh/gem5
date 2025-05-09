@@ -254,6 +254,9 @@ Queued::getPacket()
     PacketPtr pkt = pfq.front().pkt;
     pfq.pop_front();
 
+    // If this is an LLC prefetcher, set the flag to indicate that this packet is requested by LLC
+    pkt->is_llc_prefetch = true;
+
     prefetchStats.pfIssued++;
     issuedPrefetches += 1;
     assert(pkt != nullptr);

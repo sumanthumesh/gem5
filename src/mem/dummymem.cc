@@ -173,6 +173,12 @@ DummyMem::accessAndRespond(PacketPtr pkt)
 
     access(pkt);
 
+    if (pkt->is_llc_prefetch)
+    {
+        fatal_if(!pkt->cmd.isPrefetch,"Pkt is marked LLC prefetch but is not a prefetch at all\n");
+        DPRINTF(DummyMem, "LLC Prefetch");
+    }
+
     // turn packet around to go back to requestor if response expected
     if (needsResponse) {
         // access already turned the packet into a response

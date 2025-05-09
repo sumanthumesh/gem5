@@ -115,7 +115,7 @@ Base::Base(const BasePrefetcherParams &p)
 }
 
 void
-Base::setParentInfo(System *sys, ProbeManager *pm, unsigned blk_size)
+Base::setParentInfo(System *sys, ProbeManager *pm, unsigned blk_size, bool is_llc)
 {
     assert(!system && !probeManager);
     system = sys;
@@ -123,6 +123,7 @@ Base::setParentInfo(System *sys, ProbeManager *pm, unsigned blk_size)
     // If the cache has a different block size from the system's, save it
     blkSize = blk_size;
     lBlkSize = floorLog2(blkSize);
+    is_llc_prefetcher = is_llc;
 }
 
 Base::StatGroup::StatGroup(statistics::Group *parent)

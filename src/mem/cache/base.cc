@@ -114,7 +114,8 @@ BaseCache::BaseCache(const BaseCacheParams &p, unsigned blk_size)
       missCount(p.max_miss_count),
       addrRanges(p.addr_ranges.begin(), p.addr_ranges.end()),
       system(p.system),
-      stats(*this)
+      stats(*this),
+      is_llc(p.is_llc)
 {
     // the MSHR queue has no reserve entries as we check the MSHR
     // queue on every single allocation, whereas the write queue has
@@ -129,7 +130,7 @@ BaseCache::BaseCache(const BaseCacheParams &p, unsigned blk_size)
 
     tags->tagsInit();
     if (prefetcher)
-        prefetcher->setParentInfo(system, getProbeManager(), getBlockSize());
+        prefetcher->setParentInfo(system, getProbeManager(), getBlockSize(), is_llc);
 
     fatal_if(compressor && !dynamic_cast<CompressedTags*>(tags),
         "The tags of compressed cache %s must derive from CompressedTags",
