@@ -29,7 +29,7 @@ DummyMem::DummyMem(const Params &p) :
     if (record)
         record_file_ptr.open(record_file);
 
-    registerExitCallback([this]() { 
+    registerExitCallback([this]() {
         std::cout<<"Finished DummyMem simulation\n";
         std::cout<<"NUM READS : "<<num_reads<<"\n";
         std::cout<<"NUM WRITES: "<<num_writes<<"\n";
@@ -138,11 +138,11 @@ DummyMem::recvTimingReq(PacketPtr pkt)
     }
 
     bool enqueue_success = false;
-    if (pkt->isRead()) 
+    if (pkt->isRead())
     {
         accessAndRespond(pkt);
         req_id++;
-    } 
+    }
     else if (pkt->isWrite()) {
         accessAndRespond(pkt);
         req_id++;
