@@ -175,7 +175,7 @@ DummyMem::accessAndRespond(PacketPtr pkt)
 
     if (pkt->is_llc_prefetch)
     {
-        fatal_if(!pkt->cmd.isPrefetch,"Pkt is marked LLC prefetch but is not a prefetch at all\n");
+        fatal_if(!pkt->cmd.isPrefetch(),"Pkt is marked LLC prefetch but is not a prefetch at all\n");
         DPRINTF(DummyMem, "LLC Prefetch");
     }
 

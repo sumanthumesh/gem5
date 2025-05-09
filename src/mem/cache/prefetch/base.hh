@@ -383,7 +383,7 @@ class Base : public ClockedObject
     virtual ~Base() = default;
 
     virtual void
-    setParentInfo(System *sys, ProbeManager *pm, unsigned blk_size);
+    setParentInfo(System *sys, ProbeManager *pm, unsigned blk_size, bool llc = false);
 
     /**
      * Notify prefetcher of cache access (may be any access or just

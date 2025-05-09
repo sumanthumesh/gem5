@@ -53,7 +53,7 @@ Multi::Multi(const MultiPrefetcherParams &p)
 }
 
 void
-Multi::setParentInfo(System *sys, ProbeManager *pm, unsigned blk_size)
+Multi::setParentInfo(System *sys, ProbeManager *pm, unsigned blk_size, bool is_llc)
 {
     for (auto pf : prefetchers)
         pf->setParentInfo(sys, pm, blk_size);

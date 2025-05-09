@@ -57,7 +57,7 @@ class Multi : public Base
 
   public:
     void
-    setParentInfo(System *sys, ProbeManager *pm, unsigned blk_size) override;
+    setParentInfo(System *sys, ProbeManager *pm, unsigned blk_size, bool llc) override;
     PacketPtr getPacket() override;
     Tick nextPrefetchReadyTime() const override;
 
