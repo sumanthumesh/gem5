@@ -550,6 +550,8 @@ Cache::createMissPacket(PacketPtr cpu_pkt, CacheBlk *blk,
             (force_clean_rsp ? MemCmd::ReadCleanReq : MemCmd::ReadSharedReq);
     }
     PacketPtr pkt = new Packet(cpu_pkt->req, cmd, blkSize);
+    // Copy the value of the is_llc_prefetch
+    pkt->is_llc_prefetch = cpu_pkt->is_llc_prefetch;
 
     // if there are upstream caches that have already marked the
     // packet as having sharers (not passing writable), pass that info

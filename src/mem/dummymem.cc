@@ -137,6 +137,13 @@ DummyMem::recvTimingReq(PacketPtr pkt)
         record_file_ptr << std::dec << curTick() << " " << std::hex << (pkt->req->hasVaddr() ? pkt->req->getVaddr() : pkt->getAddr()) << " " << (pkt->isRead() ? "R" : "W") << std::endl;
     }
 
+    // Check if pkt has is_llc_prefetch set
+    if(pkt->is_llc_prefetch)
+    {
+        DPRINTF(DummyMem, "Prefetch pkt from LLC\n");
+        std::cout<<"Prefetch pkt at mem "<<pkt->id<<std::endl;
+    }
+
     bool enqueue_success = false;
     if (pkt->isRead())
     {
@@ -171,13 +178,11 @@ DummyMem::accessAndRespond(PacketPtr pkt)
 
     bool needsResponse = pkt->needsResponse();
 
+    if(pkt->cmd.isPrefetch())
+        std::cout<<"Prefetch"<<"\n";
+    
     access(pkt);
 
-    if (pkt->is_llc_prefetch)
-    {
-        fatal_if(!pkt->cmd.isPrefetch(),"Pkt is marked LLC prefetch but is not a prefetch at all\n");
-        DPRINTF(DummyMem, "LLC Prefetch");
-    }
 
     // turn packet around to go back to requestor if response expected
     if (needsResponse) {

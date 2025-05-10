@@ -958,7 +958,8 @@ class Packet : public Printable, public Extensible<Packet>
            headerDelay(pkt->headerDelay),
            snoopDelay(0),
            payloadDelay(pkt->payloadDelay),
-           senderState(pkt->senderState)
+           senderState(pkt->senderState),
+           is_llc_prefetch(pkt->is_llc_prefetch)
     {
         if (!clear_flags)
             flags.set(pkt->flags & COPY_FLAGS);

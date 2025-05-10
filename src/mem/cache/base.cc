@@ -935,6 +935,13 @@ BaseCache::getNextQueueEntry()
                 assert(pkt->req->requestorId() < system->maxRequestors());
                 stats.cmdStats(pkt).mshrMisses[pkt->req->requestorId()]++;
 
+                
+                if(pkt->is_llc_prefetch)
+                {
+                    DPRINTF(HWPrefetch, "LLC Prefetch\n");
+                    std::cout<<"LLC Prefetch Pkt: "<<pkt->id<<std::endl;
+                }
+
                 // allocate an MSHR and return it, note
                 // that we send the packet straight away, so do not
                 // schedule the send
