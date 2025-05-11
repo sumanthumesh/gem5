@@ -939,7 +939,7 @@ BaseCache::getNextQueueEntry()
                 if(pkt->is_llc_prefetch)
                 {
                     DPRINTF(HWPrefetch, "LLC Prefetch\n");
-                    std::cout<<"LLC Prefetch Pkt: "<<pkt->id<<std::endl;
+                    // std::cout<<"LLC Prefetch Pkt: "<<pkt->id<<std::endl;
                 }
 
                 // allocate an MSHR and return it, note
