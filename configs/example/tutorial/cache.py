@@ -50,4 +50,4 @@ class L3Cache(Cache):
         self.mshrs = 32
         self.tgts_per_mshr = 12
         self.is_llc = True
-        self.prefetcher = StridePrefetcher()
+        # self.prefetcher = StridePrefetcher()
