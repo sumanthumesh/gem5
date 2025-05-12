@@ -3,6 +3,7 @@ from m5.objects import *
 # Custom cache classes (add these if not imported directly)
 class L1ICache(Cache):
     def __init__(self, size='32kB', assoc=4):
+    # def __init__(self, size='64B', assoc=4):
         super(L1ICache, self).__init__()
         self.size = size
         self.assoc = assoc
@@ -14,6 +15,7 @@ class L1ICache(Cache):
 
 class L1DCache(Cache):
     def __init__(self, size='32kB', assoc=4):
+    # def __init__(self, size='64B', assoc=4):
         super(L1DCache, self).__init__()
         self.size = size
         self.assoc = assoc
@@ -25,6 +27,7 @@ class L1DCache(Cache):
 
 class L2Cache(Cache):
     def __init__(self, size='256kB', assoc=8):
+    # def __init__(self, size='64B', assoc=8):
         super(L2Cache, self).__init__()
         self.size = size
         self.assoc = assoc
@@ -37,6 +40,7 @@ class L2Cache(Cache):
 
 class L3Cache(Cache):
     def __init__(self, size='8MB', assoc=16):
+    # def __init__(self, size='64B', assoc=16):
         super(L3Cache, self).__init__()
         self.size = size
         self.assoc = assoc
@@ -46,3 +50,4 @@ class L3Cache(Cache):
         self.mshrs = 32
         self.tgts_per_mshr = 12
         self.is_llc = True
+        self.prefetcher = StridePrefetcher()
