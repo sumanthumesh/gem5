@@ -94,6 +94,16 @@ parser.add_argument(
     help="Size of DAM in case of CXLSIM in number of pages",
     default=64*1024/4
 )
+parser.add_argument(
+    "--perfect-demand-misses",
+    action="store_true",
+    help="Set to true if we want to make demand misses zero latency"
+)
+parser.add_argument(
+    "--prefetcher",
+    action="store_true",
+    help="Set to true if we want prefetcher"
+)
 
 
 args = parser.parse_args()
@@ -145,7 +155,9 @@ else:
 if not args.no_cache:
     # system.l3cache = L3Cache(size="8MB", assoc=16)  # Shared L3 cache
     system.l3cache = L3Cache(size=f"2MB", assoc=16)  # Shared L3 cache
-
+    if args.prefetcher:
+        system.l3cache.prefetcher = StridePrefetcher()
+    
     system.l2_to_l3bus = SystemXBar()
     if args.bus_width != None:
         system.l2_to_l3bus.width = args.bus_width
@@ -163,6 +175,9 @@ for cpu in system.cpus:
         # cpu.dcache = L1DCache(size="32kB", assoc=4)
         cpu.icache = L1ICache(size="32kB", assoc=4)
         cpu.dcache = L1DCache(size="32kB", assoc=4)
+        if args.prefetcher:
+            cpu.icache.prefetcher = StridePrefetcher()
+            cpu.dcache.prefetcher = StridePrefetcher()
 
         # Connect CPU to L1
         cpu.icache_port = cpu.icache.cpu_side
@@ -171,6 +186,8 @@ for cpu in system.cpus:
         # Create L2
         # cpu.l2cache = L2Cache(size="256kB", assoc=8)
         cpu.l2cache = L2Cache(size="256kB", assoc=8)
+        if args.prefetcher:
+            cpu.l2cache.prefetcher = StridePrefetcher()
 
         # Create bus from L1 to L2
         cpu.l1_to_l2bus = L2XBar()
@@ -235,11 +252,12 @@ elif args.mem == "cxlsim":
     system.mem_ctrl = mem_ctrl
 elif args.mem == "ramulator2":
     mem_ctrl = Ramulator2()
-    mem_ctrl.config_path = "/data2/sumanthu/gem5/ext/ramulator2/ramulator2/example_config.yaml"
+    mem_ctrl.config_path = "/data1/sumanthu/gem5/ext/ramulator2/ramulator2/example_config.yaml"
     mem_ctrl.range = system.mem_ranges[0]
     mem_ctrl.port = system.membus.mem_side_ports
     mem_ctrl.record = args.record
     system.mem_ctrl = mem_ctrl
+    mem_ctrl.perfect_demand_misses = args.perfect_demand_misses
 elif args.mem == "dummymem":
     #Make sure memory mode is atomic
     assert args.mem_mode == "timing", f"DummyMem only supports timing mode, not {args.mem_mode}"
