@@ -28,6 +28,8 @@ void multiplySubMatrix(const std::vector<std::vector<int>>& A,
     int colsB = B[0].size();
     int colsA = A[0].size();
 
+    int cumulative_counter = 0;
+
     for (int i = startRow; i < endRow; ++i) {
         for (int j = 0; j < colsB; ++j) {
             int sum = 0;
@@ -35,6 +37,9 @@ void multiplySubMatrix(const std::vector<std::vector<int>>& A,
                 sum += A[i][k] * B[k][j];
             }
             C[i][j] = sum;
+            cumulative_counter++;
+            if(cumulative_counter%10000==0)
+                std::cout<<"P"<<std::endl;
         }
     }
 }
@@ -43,7 +48,7 @@ int main(int argc, char **argv) {
     const int rows = std::atoi(argv[1]);
     const int cols = std::atoi(argv[1]);
     const int numThreads = std::atoi(argv[2]);
-    std::cout<<"B1\n";
+    std::cout<<"Num Threads: "<<numThreads<<std::endl;
 
     // Generate matrices
     auto A = generateMatrix(rows, cols);
