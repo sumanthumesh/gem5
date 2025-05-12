@@ -21,7 +21,7 @@ std::vector<std::vector<int>> generateMatrix(int rows, int cols) {
 }
 
 // Function to multiply a submatrix
-void multiplySubMatrix(const std::vector<std::vector<int>>& A, 
+void multiplySubMatrix(const std::vector<std::vector<int>>& A,
                        const std::vector<std::vector<int>>& B,
                        std::vector<std::vector<int>>& C,
                        int startRow, int endRow) {
