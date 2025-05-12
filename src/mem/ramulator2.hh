@@ -116,6 +116,8 @@ class Ramulator2 : public AbstractMemory
     //Store number of reads and writes for reference
     uint64_t num_reads = 0;
     uint64_t num_writes = 0;
+    uint64_t num_prefetches = 0;
+    uint64_t num_immediate_responses = 0;
 
     /**
      * Bool telling us whether to record data from reads or writes
@@ -127,6 +129,13 @@ class Ramulator2 : public AbstractMemory
 
     // Req id
     uint64_t req_id;
+
+    /**
+     * If we want ramulator to behave like a perfect DRAM, i.e, with infinite bandwidth and 0 latency
+     * But handle prefetch instructions with the normal bandwidth and latency we can use this feature
+     * Set the bool to true
+     */
+    bool perfect_demand_misses = false;
 
   public:
 

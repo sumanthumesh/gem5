@@ -29,7 +29,8 @@ Ramulator2::Ramulator2(const Params &p) :
     retryReq(false), retryResp(false), startTick(0),
     nbrOutstandingReads(0), nbrOutstandingWrites(0),
     sendResponseEvent([this]{ sendResponse(); }, name()),
-    tickEvent([this]{ tick(); }, name()), record(p.record), req_id(0), record_file("record_ramulator2.dat")
+    tickEvent([this]{ tick(); }, name()), record(p.record), req_id(0), record_file("record_ramulator2.dat"),
+    perfect_demand_misses(p.perfect_demand_misses)
 {
     DPRINTF(Ramulator2, "Instantiated Ramulator2 \n");
 
@@ -40,6 +41,8 @@ Ramulator2::Ramulator2(const Params &p) :
     registerExitCallback([this]() { 
         std::cout<<"NUM READS : "<<num_reads<<"\n";
         std::cout<<"NUM WRITES: "<<num_writes<<"\n";
+        std::cout<<"NUM PREFETCHES:"<<num_prefetches<<"\n";
+        std::cout<<"NUM IMMEDIATE RESP:"<<num_immediate_responses<<"\n";
         ramulator2_frontend->finalize();
         ramulator2_memorysystem->finalize();
         panic_if(nbrOutstanding()!=0, "All requests haven't been fulfilled\n");
@@ -179,6 +182,26 @@ Ramulator2::recvTimingReq(PacketPtr pkt)
     if (retryReq)
         return false;
 
+    if (pkt->is_llc_prefetch)
+    {
+        num_prefetches++;
+    }
+
+    // If the perfect demand miss mode is enabled, reply to demand misses right here
+    // Prefetches will be handled in the normal manner
+    if (perfect_demand_misses && !pkt->is_llc_prefetch)
+    {
+        accessAndRespond(pkt);
+        num_immediate_responses++;
+        if(pkt->isRead())
+            num_reads++;
+        else if(pkt->isWrite())
+            num_writes++;
+        else
+            fatal("Expected only read or write instructions\n"); 
+        return true;
+    }
+
     bool enqueue_success = false;
     if (pkt->isRead()) 
     {
@@ -292,8 +315,13 @@ Ramulator2::accessAndRespond(PacketPtr pkt)
         // access already turned the packet into a response
         assert(pkt->isResponse());
 
+        Tick time = curTick();
+
         // Assume frontend latency = 0
-        Tick time = curTick() + pkt->headerDelay + pkt->payloadDelay;
+        // Do not add any latency for demand misses if we are assuming perfect demand misses
+        if (!perfect_demand_misses)
+            time = curTick() + pkt->headerDelay + pkt->payloadDelay;
+
         // Here we reset the timing of the packet before sending it out.
         pkt->headerDelay = pkt->payloadDelay = 0;
 

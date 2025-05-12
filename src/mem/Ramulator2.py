@@ -9,6 +9,7 @@ class Ramulator2(AbstractMemory):
 
   port = ResponsePort("The port for receiving memory requests and sending responses")
   config_path = Param.String("Path to the DRAMSys configuration")
-  record = Param.Bool("Set to true to record accesses")
+  record = Param.Bool(False,"Set to true to record accesses")
+  perfect_demand_misses = Param.Bool(False,"Set to true to make all demand misses take 0 latency. But prefetches take normal latency")
 
   
