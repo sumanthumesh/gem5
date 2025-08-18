@@ -50,7 +50,7 @@ CXLSimGem5::CXLSimGem5(const Params &p) :
     mem_model->add_clk(static_cast<int64_t>(CXL::params.ticks_per_ins));
     mem_model->add_clk(static_cast<int64_t>(CXL::params.ramulator_update_delay_ns));
 
-    page_mgr = std::make_unique<PageManager>(page_size,dam_size);
+    page_mgr = std::make_unique<PageManager>(p.page_size,p.res_size,p.dam_size);
 
     // Record data written to and read from memory
     if (record)
@@ -238,9 +238,7 @@ CXLSimGem5::recvTimingReq(PacketPtr pkt)
      * If all_dam is set, then is_cxl_access should always be false
      * If all_cxl is set, then is_cxl_access should always be true
      * If neither of all_dam or all_cxl is set,
-     * 1. Find out if any special regions are accessed
-     * 2. Check if this region is present in the mapped_regions
-     * 3. If it is in mapped regions, it is a CXL access, if not it will be a DAM access
+     * Check page manager access, if it is true, DAM access, else CXL access
      */
      
     //Get address and opcode
@@ -270,42 +268,9 @@ CXLSimGem5::recvTimingReq(PacketPtr pkt)
         //We are in region of interest
         //We dont have all_dam or all_cxl set
 
-        //Find if the access touches any of our special address regions
-        accessed_regions = find_accessed_region(pkt->req->hasVaddr()?((pkt->req->getVaddr()>>6)<<6):0,pkt->req->getSize());
-        auto mapped_regions = system()->getMappedRegions();
-        if(accessed_regions.size()==0)
-        {
-            //This is a non table/temp access, it does not touch any of our special regions
-            //Need to check if it will goto DAM or CXL based on whether we have space in DAM
-            is_cxl_access = page_mgr->isCXLBound(pkt->req->hasVaddr()?pkt->req->getVaddr():0);
-            if(is_cxl_access)
-            {
-                page_mgr->addCXLTempPage(addr);
-            }
-        }
-        else 
-        {
-            //This is a table access
-            //Assume it goes to CXL
+        bool can_dam_satisfy = page_mgr->access(addr);
+        if (!can_dam_satisfy)
             is_cxl_access = true;
-            for (auto &v: accessed_regions)
-            {
-                //If accessed region is mapped to DAM i.e., the region is present in mapped_regions
-                if (mapped_regions->find(v) != mapped_regions->end())
-                {
-                    is_cxl_access = false;
-                    break;
-                }
-            }
-            if(is_cxl_access)
-            {
-                page_mgr->addCXLTablePage(addr);
-            }
-            else
-            {
-                page_mgr->addDAMTablePage(addr);
-            }
-        }
     }
     // if(accessed_regions.size()>0)
     //     std::cout<<(pkt->req->hasVaddr()?((pkt->req->getVaddr()>>6)<<6):0)<<std::endl;

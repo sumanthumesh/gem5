@@ -95,6 +95,12 @@ parser.add_argument(
     default=64*1024/4
 )
 parser.add_argument(
+    "--res-size",
+    type=int,
+    help="Size of reserved DAM in case of CXLSIM in number of pages",
+    default=64*1024/4
+)
+parser.add_argument(
     "--perfect-demand-misses",
     action="store_true",
     help="Set to true if we want to make demand misses zero latency"
@@ -247,6 +253,7 @@ elif args.mem == "cxlsim":
         mem_ctrl.all_cxl = False
     mem_ctrl.page_size = args.page_size
     mem_ctrl.dam_size = args.dam_size
+    mem_ctrl.res_size = args.res_size
     mem_ctrl.skip_cycle = False
     mem_ctrl.record = args.record
     system.mem_ctrl = mem_ctrl
