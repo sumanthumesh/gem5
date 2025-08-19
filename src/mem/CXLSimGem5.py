@@ -21,5 +21,6 @@ class CXLSimGem5(AbstractMemory):
     res_size = Param.Unsigned("Size of the reserved DAM fraction in number of pages")
     dam_size = Param.Unsigned("Size of the DAM in number of pages")
     page_size = Param.Unsigned("Size of a page in Bytes")
+    cxl_mode = Param.Unsigned("Mode in which memory should operate")
 
 #   system = Param.System(Parent.any, "System this memory is part of")

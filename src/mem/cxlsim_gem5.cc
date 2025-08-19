@@ -35,7 +35,7 @@ CXLSimGem5::CXLSimGem5(const Params &p) :
     sendResponseEvent([this]{ sendResponse(); }, name()),
     tickEvent([this]{ tick(); }, name()), record(p.record), num_reads(0), num_writes(0), req_id(0), record_file("record_cxlsim.dat"),
     cxl_accesses(0), dam_accesses(0), cxl_accesses_roi(0), dam_accesses_roi(0), all_cxl(p.all_cxl), all_dam(p.all_dam), 
-    page_size(p.page_size), dam_size(p.dam_size)
+    page_size(p.page_size), dam_size(p.dam_size), cxl_mode(p.cxl_mode)
 {
     DPRINTF(CXLSimGem5, "Instantiated CXLSimGem5 \n");
 
@@ -249,33 +249,46 @@ CXLSimGem5::recvTimingReq(PacketPtr pkt)
     bool is_cxl_access = false;
     //Variable to store accessed regions
     std::vector<size_t> accessed_regions;
-    //Check if all_dam is set
-    if(all_dam)
-    {
-        is_cxl_access = false;
-    }
-    else if(all_cxl)
-    {
-        is_cxl_access = true;
-    }
-    else if(!system()->isMemRegionROI())
+    
+    if(!system()->isMemRegionROI())
     {
         //If we are not in the region of interest, just send everything to DAM, no point in maintaining any sort of page management
         is_cxl_access = false;
     }
     else
     {
-        //We are in region of interest
-        //We dont have all_dam or all_cxl set
-
-        bool can_dam_satisfy = page_mgr->access(addr);
-        if (!can_dam_satisfy)
-            is_cxl_access = true;
+        // Run based on correct modes
+        switch(cxl_mode)
+        {
+            case 0:
+                // All DAM
+                is_cxl_access = false;
+            break;
+            case 1:
+                // All CXL
+                is_cxl_access = true;
+            break;
+            case 2:
+                // Table pages to CXL
+                // Table accesses goto CXL. Remaining goto DAM
+                accessed_regions = find_accessed_region(pkt->req->hasVaddr()?((pkt->req->getVaddr()>>6)<<6):0,pkt->req->getSize());
+                if (!accessed_regions.empty())
+                    is_cxl_access = true;
+                else
+                    is_cxl_access = false;
+            break;
+            case 3:
+            {
+                bool can_dam_satisfy = page_mgr->access(addr);
+                if (!can_dam_satisfy)
+                    is_cxl_access = true;
+            }
+            break;
+            default:
+                panic("Unknown CXL Mode %lu\n",cxl_mode);
+        }
     }
-    // if(accessed_regions.size()>0)
-    //     std::cout<<(pkt->req->hasVaddr()?((pkt->req->getVaddr()>>6)<<6):0)<<std::endl;
-    // See if any accessed region is part of mapped region, if so it should goto CXL
-
+    
     DPRINTF(CXLSimGem5, "Rcvd req %s,%lu,%#lx\n", pkt->isRead()?"R":"W", id, addr);
 
     bool enqueue_success = false;

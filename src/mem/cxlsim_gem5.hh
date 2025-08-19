@@ -443,6 +443,7 @@ class CXLSimGem5 : public AbstractMemory
     std::unique_ptr<PageManager> page_mgr;
     size_t page_size; //In bytes
     size_t dam_size; //In number of pages
+    size_t cxl_mode;
 
   public:
 

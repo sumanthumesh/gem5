@@ -83,6 +83,12 @@ parser.add_argument(
     action="store_true"
 )
 parser.add_argument(
+    "--cxl-mode",
+    help="CXL Memory mode",
+    type=int,
+    default=0
+)
+parser.add_argument(
     "--page-size",
     type=int,
     help="Size of a page in case of CXLSIM in bytes",
@@ -251,6 +257,7 @@ elif args.mem == "cxlsim":
         mem_ctrl.all_cxl = True
     else:
         mem_ctrl.all_cxl = False
+    mem_ctrl.cxl_mode = args.cxl_mode
     mem_ctrl.page_size = args.page_size
     mem_ctrl.dam_size = args.dam_size
     mem_ctrl.res_size = args.res_size
