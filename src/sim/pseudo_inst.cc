@@ -640,7 +640,7 @@ void m5memregioncmd(ThreadContext *tc, size_t n) {
         f.close();
         std::filesystem::path map_col_file = cwd / "mapping.csv";
 
-        // This file contains one column name per line
+        // This file contains two strings per line. Tablename,columnanme. Ignore tablename
 
         f.open(map_file.string());
         panic_if(!std::filesystem::exists(map_col_file),"Did not find %s to read memory regions from",map_col_file.string());
@@ -648,8 +648,8 @@ void m5memregioncmd(ThreadContext *tc, size_t n) {
         std::cout << "Loading mapping from " << map_col_file << std::endl;
         while (std::getline(f, line)) {
             // The input will look like
-            // l_lineitem
-            std::string column_name = line;
+            // lineitem,l_orderkey
+            std::string& column_name = splitString(line,',')[1];
             // Make sure region id does not exist in mapped regions already
             panic_if(tc->getSystemPtr()->getMappedColumns()->find(column_name) != tc->getSystemPtr()->getMappedColumns()->end(), "Column %s already added to map\n", column_name);
             // Add region id
