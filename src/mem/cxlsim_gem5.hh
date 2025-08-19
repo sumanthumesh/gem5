@@ -162,6 +162,13 @@ class PageManager
         //Calculate the size of the tables mapped to DAM in number of pages
         num_mapped_pages = 0;
         uint64_t mapped_bytes = 0;
+
+        std::cout<<"Mapped columns"<<std::endl;
+        for (auto &c:*mapped_columns)
+        {
+          std::cout<<c<<"\n";
+        }
+
         //Go through each region, check if it is within the mapped regions, if it is then add its size
         for(auto &x:*special_addr_regions)
         {
