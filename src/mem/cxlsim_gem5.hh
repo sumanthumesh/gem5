@@ -178,12 +178,16 @@ class PageManager
             {
                 //It is a mapped column
                 mapped_bytes += (x.second.first - x.first);
-                size_t num_pages = (size_t)std::ceil(mapped_bytes/page_size);
+                // std::printf("%lu,%lx,%lx\n",x.second.second,x.first,x.second.first);
+                size_t num_pages = (size_t)std::ceil((float)mapped_bytes/page_size);
+                // std::cout<<"NUM PAGES:"<<num_pages<<std::endl;
                 for (size_t i=0;i<num_pages;i++)
                 {
                   auto addr = x.first + i*page_size;
+                  // std::printf("Adding %lx\n",addr);
                   auto result = reserved->insert(addr);
-                  panic_if(result!=PageRegion::InsertStatus::SUCCESS,"Adding %lx to reserved during mapping failed %d\n",addr,result);
+                  // panic_if(result==PageRegion::InsertStatus::EXISTS,"Adding %lx to reserved during mapping already exists\n",addr);
+                  panic_if(result==PageRegion::InsertStatus::FAILED,"Adding %lx to reserved during mapping overflow\n",addr);
                 }
                 // std::cout<<"Detected mapped region "<<region_id<<std::endl;
                 // std::cout<<"Num Pages "<<num_pages<<std::endl;
