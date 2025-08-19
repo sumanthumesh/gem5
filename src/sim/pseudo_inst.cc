@@ -642,7 +642,7 @@ void m5memregioncmd(ThreadContext *tc, size_t n) {
 
         // This file contains two strings per line. Tablename,columnanme. Ignore tablename
 
-        f.open(map_file.string());
+        f.open(map_col_file.string());
         panic_if(!std::filesystem::exists(map_col_file),"Did not find %s to read memory regions from",map_col_file.string());
 
         std::cout << "Loading mapping from " << map_col_file << std::endl;
