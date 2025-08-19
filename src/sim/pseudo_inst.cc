@@ -573,8 +573,29 @@ void m5memregioncmd(ThreadContext *tc, size_t n) {
             // Add it to the memory regions
             addr_regions->insert({start, std::make_pair(end, region_id)});
         }
-
+        
         std::cout << "Finished loading " << addr_regions->size() << " from file" << std::endl;
+        
+        f.close();
+        std::filesystem::path labels_file = cwd / "mem_regions.csv";
+        f.open(labels_file.string());
+        panic_if(!std::filesystem::exists(labels_file),"Did not find %s to read memory labels form",labels_file.string());
+
+        auto region_labels = tc->getSystemPtr()->get_region_labels();
+
+        std::cout << "Loading mem labels from " << labels_file << std::endl;
+        while (std::getline(f, line)) {
+            // The input will look like
+            // 1:tableA,col1
+            size_t region_id = std::stoul(splitString(line,':')[0]);
+            auto s = splitString(splitString(line,':')[1], ',');
+            panic_if(s.size() != 2, "Expected 2 comma separated values, received %d %s", s.size(),line);
+            std::string& table_name = s[0],column_name = s[1];
+            // Add it to the memory regions
+            region_labels->insert({region_id, std::make_pair(table_name, column_name)});
+        }
+        std::cout << "Finished loading " << region_labels->size() << " labels from file" << std::endl;
+
         break;
     }
     case 2: //Start region of interest where we track accesses
@@ -615,6 +636,26 @@ void m5memregioncmd(ThreadContext *tc, size_t n) {
             tc->getSystemPtr()->getMappedRegions()->insert(region_id);
         }
         std::cout << "Finished loading " << tc->getSystemPtr()->getMappedRegions()->size() << " from "<< map_file << std::endl;
+
+        f.close();
+        std::filesystem::path map_col_file = cwd / "mapping.csv";
+
+        // This file contains one column name per line
+
+        f.open(map_file.string());
+        panic_if(!std::filesystem::exists(map_col_file),"Did not find %s to read memory regions from",map_col_file.string());
+
+        std::cout << "Loading mapping from " << map_col_file << std::endl;
+        while (std::getline(f, line)) {
+            // The input will look like
+            // l_lineitem
+            std::string column_name = line;
+            // Make sure region id does not exist in mapped regions already
+            panic_if(tc->getSystemPtr()->getMappedColumns()->find(column_name) != tc->getSystemPtr()->getMappedColumns()->end(), "Column %s already added to map\n", column_name);
+            // Add region id
+            tc->getSystemPtr()->getMappedColumns()->insert(column_name);
+        }
+        std::cout << "Finished loading " << tc->getSystemPtr()->getMappedColumns()->size() << " from "<< map_col_file << std::endl;
 
         //Call the memory's warmup function
         tc->getSystemPtr()->getFirstDeviceMemory()->warmUp();

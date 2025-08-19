@@ -100,7 +100,6 @@ class PageManager
     PageManager(size_t page_size,size_t res_size,size_t dam_size) : 
     page_size(page_size),num_accesses(0)
     {
-        // Warmup
         reserved = std::make_unique<PageRegion>(page_size,res_size,"Reserved");
         remaining = std::make_unique<PageRegion>(page_size,dam_size-res_size,"Remaining");
         cxl = std::make_unique<PageRegion>(page_size,std::numeric_limits<size_t>::max(),"CXL");
@@ -132,6 +131,45 @@ class PageManager
             if(mapped_regions->find(region_id)!=mapped_regions->end())
             {
                 //It is a mapped region
+                mapped_bytes += (x.second.first - x.first);
+                size_t num_pages = (size_t)std::ceil(mapped_bytes/page_size);
+                for (size_t i=0;i<num_pages;i++)
+                {
+                  auto addr = x.first + i*page_size;
+                  auto result = reserved->insert(addr);
+                  panic_if(result!=PageRegion::InsertStatus::SUCCESS,"Adding %lx to reserved during mapping failed %d\n",addr,result);
+                }
+                // std::cout<<"Detected mapped region "<<region_id<<std::endl;
+                // std::cout<<"Num Pages "<<num_pages<<std::endl;
+                // std::cout<<"Page size "<<page_size<<std::endl;
+                // std::cout<<"Start "<<std::hex<<x.first<<std::dec<<std::endl;
+                // std::cout<<"End "<<std::hex<<x.second.first<<std::dec<<std::endl;
+            }
+        }
+        num_mapped_pages = reserved->getSize();
+        //Reset the dam temp sizes
+        panic_if(reserved->getMaxSize()<num_mapped_pages,"Reserved size (%lu) is less than number of mapped pages (%lu)",reserved->getMaxSize(),num_mapped_pages);
+        //Number of mapped pages 
+        std::cout<<"Added "<<num_mapped_pages<<" reserved table pages"<<std::endl;
+        //Number of mapped pages 
+        // std::cout<<"MaxSize of DAM temp table "<<remaning->getMaxSize()<<std::endl;
+    }
+    
+    void warmup(std::unordered_set<std::string> *mapped_columns,std::map<uint64_t,std::pair<uint64_t,size_t>> *special_addr_regions,std::unordered_map<size_t,std::pair<std::string,std::string>> *region_labels)
+    {
+        // Store all pages belonging to mapped columns into reserved
+
+        //Calculate the size of the tables mapped to DAM in number of pages
+        num_mapped_pages = 0;
+        uint64_t mapped_bytes = 0;
+        //Go through each region, check if it is within the mapped regions, if it is then add its size
+        for(auto &x:*special_addr_regions)
+        {
+            size_t region_id = x.second.second;
+            std::string& column_name = region_labels->find(region_id)->second.second;
+            if(mapped_columns->find(column_name)!=mapped_columns->end())
+            {
+                //It is a mapped column
                 mapped_bytes += (x.second.first - x.first);
                 size_t num_pages = (size_t)std::ceil(mapped_bytes/page_size);
                 for (size_t i=0;i<num_pages;i++)

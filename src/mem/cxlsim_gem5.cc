@@ -108,7 +108,7 @@ CXLSimGem5::warmUp()
 {
     std::cout<<"CXLSim Warmup"<<std::endl;
     //This is where we warm up the page table manager
-    page_mgr->warmup(system()->getMappedRegions(),system()->get_special_addr_regions());
+    page_mgr->warmup(system()->getMappedColumns(),system()->get_special_addr_regions(),system()->get_region_labels());
 }
 
 void

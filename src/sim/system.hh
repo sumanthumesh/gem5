@@ -332,6 +332,7 @@ class System : public SimObject, public PCEventScope
      */
 
     std::map<uint64_t, std::pair<uint64_t, size_t>> addr_regions;
+    std::unordered_map<size_t, std::pair<std::string,std::string>> region_labels;
 
     /**
      * This flag marks region of interest within which we monitor memory accesses
@@ -343,6 +344,7 @@ class System : public SimObject, public PCEventScope
      * This set holds all region ids which have been read from mapping file
      */
     std::unordered_set<size_t> mapped_regions;
+    std::unordered_set<std::string> mapped_columns;
 
   public:
     /**
@@ -407,6 +409,7 @@ class System : public SimObject, public PCEventScope
      * Return a pointer to data structure holding the special address regions indicated by the m5_add_mem_region API
      */
     std::map<uint64_t,std::pair<uint64_t,size_t>> *get_special_addr_regions() {return &addr_regions;}
+    std::unordered_map<size_t, std::pair<std::string,std::string>> *get_region_labels() {return &region_labels;}
     /**
      * Set the monitor_special_addr_regions flags
      */
@@ -417,6 +420,7 @@ class System : public SimObject, public PCEventScope
      * Return pointer to set which has the mapped memory regions
      */
     std::unordered_set<size_t>* getMappedRegions() {return &mapped_regions;}
+    std::unordered_set<std::string>* getMappedColumns() {return &mapped_columns;}
 
 
     /*
